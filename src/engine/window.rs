@@ -11,6 +11,7 @@ use glutin::surface::{GlSurface, Surface, SwapInterval, WindowSurface};
 use raw_window_handle::HasWindowHandle;
 use crate::render::backend::opengl::{OpenGlBackend, pick_gl_config};
 use crate::render::RaycastRenderer;
+use crate::resources::types::shader::ShaderAsset;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::Window;
 
@@ -39,7 +40,11 @@ pub struct WindowContext {
 }
 
 impl WindowContext {
-    pub fn create(event_loop: &ActiveEventLoop, config: &EngineConfig) -> Self {
+    pub fn create(
+        event_loop: &ActiveEventLoop,
+        config: &EngineConfig,
+        shader: &ShaderAsset,
+    ) -> Self {
         let window_attributes = Window::default_attributes()
             .with_title(config.title.clone())
             .with_inner_size(winit::dpi::LogicalSize::new(
@@ -99,7 +104,7 @@ impl WindowContext {
             })
         };
 
-        let backend = OpenGlBackend::new(gl);
+        let backend = OpenGlBackend::new(gl, shader);
         let mut renderer = RaycastRenderer::new(backend);
         renderer.resize(width, height);
 

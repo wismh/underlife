@@ -9,3 +9,12 @@ path = "art/textures/floor.png"
 [[texture]]
 name = "sky"
 path = "art/textures/sky.png"
+
+[[map]]
+name = "demo"
+path = "levels/demo.map"
+
+[[shader]]
+name = "raycast"
+vert = "shaders/raycast.vert"
+frag = "shaders/raycast.frag"

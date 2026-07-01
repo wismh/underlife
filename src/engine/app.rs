@@ -10,8 +10,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
 
 use crate::engine::window::{EngineConfig, WindowContext};
-use crate::game::{default_player, map, Map, Player, MOVE_SPEED, ROTATE_SPEED};
-use crate::resources::assets::texture;
+use crate::game::{default_player, Player, MOVE_SPEED, ROTATE_SPEED};
+use crate::resources::assets::{map, shader, texture};
 
 pub fn run() -> Result<(), winit::error::EventLoopError> {
     let event_loop = EventLoop::new()?;
@@ -23,7 +23,6 @@ struct App {
     window: Option<WindowContext>,
     resources: ResourceManager,
     player: Player,
-    map: Map,
     keys: HashSet<KeyCode>,
     last_frame: Instant,
 }
@@ -34,7 +33,6 @@ impl App {
             window: None,
             resources: ResourceManager::load_all(),
             player: default_player(),
-            map: Map::new(map::map_data()),
             keys: HashSet::new(),
             last_frame: Instant::now(),
         }
@@ -45,7 +43,9 @@ impl App {
             return;
         }
 
-        let mut window = WindowContext::create(event_loop, &EngineConfig::default());
+        let raycast_shader = self.resources.shader(shader::RAYCAST);
+        let mut window =
+            WindowContext::create(event_loop, &EngineConfig::default(), raycast_shader);
         self.upload_gpu_resources(&mut window);
         self.window = Some(window);
     }
@@ -54,12 +54,12 @@ impl App {
         let wall = self.resources.texture(texture::BRICK);
         let floor = self.resources.texture(texture::FLOOR);
         let ceiling = self.resources.texture(texture::SKY);
-        let map_cells = self.map.cells();
+        let level = self.resources.map(map::DEMO);
 
         window.renderer.set_wall_texture(wall);
         window.renderer.set_floor_texture(floor);
         window.renderer.set_ceiling_texture(ceiling);
-        window.renderer.set_map(map_cells, map::MAP_W as u32, map::MAP_H as u32);
+        window.renderer.set_map(level);
     }
 
     fn update(&mut self, dt: f32) {
@@ -75,8 +75,12 @@ impl App {
             (self.key_down(KeyCode::KeyD) as i32 - self.key_down(KeyCode::KeyA) as i32) as f32;
 
         if forward != 0.0 || strafe != 0.0 {
-            self.player
-                .move_relative(self.map.grid(), forward, strafe, MOVE_SPEED * dt);
+            self.player.move_relative(
+                self.resources.map(map::DEMO),
+                forward,
+                strafe,
+                MOVE_SPEED * dt,
+            );
         }
     }
 

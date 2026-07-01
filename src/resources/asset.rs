@@ -20,6 +20,10 @@ pub enum AssetError {
         #[source]
         source: image::ImageError,
     },
+    #[error("invalid map at {path}: {reason}")]
+    InvalidMap { path: String, reason: String },
+    #[error("unsupported loader for {kind}: {hint}")]
+    UnsupportedLoader { kind: &'static str, hint: &'static str },
     #[error("unknown asset kind: {0}")]
     UnknownKind(String),
 }

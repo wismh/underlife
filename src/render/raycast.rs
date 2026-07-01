@@ -1,3 +1,4 @@
+use crate::resources::types::map::MapAsset;
 use crate::resources::types::texture::TextureAsset;
 use crate::render::api::{MapView, RaycastScene, RenderBackend};
 
@@ -40,10 +41,14 @@ impl<B: RenderBackend> RaycastRenderer<B> {
         self.ceiling = Some(self.backend.upload_texture_rgba(texture.as_view()));
     }
 
-    pub fn set_map(&mut self, cells: &[u8], width: u32, height: u32) {
-        self.map = Some(self.backend.upload_texture_r8(cells, width, height));
-        self.map_width = width;
-        self.map_height = height;
+    pub fn set_map(&mut self, map: &MapAsset) {
+        let cells = map.cells_r8();
+        self.map = Some(
+            self.backend
+                .upload_texture_r8(&cells, map.width, map.height),
+        );
+        self.map_width = map.width;
+        self.map_height = map.height;
     }
 
     pub fn draw(&mut self, scene: &RaycastScene) {

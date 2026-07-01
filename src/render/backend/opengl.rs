@@ -2,6 +2,7 @@ use glow::HasContext;
 use glutin::config::GlConfig;
 
 use crate::render::api::{MapView, RaycastScene, RenderBackend, TextureView};
+use crate::resources::types::shader::ShaderAsset;
 
 pub struct GlTexture(glow::NativeTexture);
 
@@ -16,13 +17,9 @@ pub struct OpenGlBackend {
 }
 
 impl OpenGlBackend {
-    pub fn new(gl: glow::Context) -> Self {
+    pub fn new(gl: glow::Context, shader: &ShaderAsset) -> Self {
         unsafe {
-            let program = compile_program(
-                &gl,
-                include_str!("../../../shaders/raycast.vert"),
-                include_str!("../../../shaders/raycast.frag"),
-            );
+            let program = compile_program(&gl, &shader.vertex, &shader.fragment);
 
             let vao = gl.create_vertex_array().expect("create VAO");
             gl.bind_vertex_array(Some(vao));

@@ -2,30 +2,60 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
 use crate::resources::asset::Asset;
-use crate::resources::assets::TEXTURES;
+use crate::resources::assets::{MAPS, SHADERS, TEXTURES};
+use crate::resources::types::map::MapAsset;
+use crate::resources::types::shader::ShaderAsset;
 use crate::resources::types::texture::TextureAsset;
-use crate::resources::uid::{TextureTag, TextureUid};
+use crate::resources::uid::{MapTag, MapUid, ShaderTag, ShaderUid, TextureTag, TextureUid};
 
 pub struct ResourceManager {
     assets_root: PathBuf,
     textures: TypedStore<TextureTag, TextureAsset>,
+    maps: TypedStore<MapTag, MapAsset>,
+    shaders: TypedStore<ShaderTag, ShaderAsset>,
 }
 
 impl ResourceManager {
     pub fn load_all() -> Self {
         let assets_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
         let mut textures = TypedStore::<TextureTag, TextureAsset>::with_capacity(TEXTURES.len());
+        let mut maps = TypedStore::<MapTag, MapAsset>::with_capacity(MAPS.len());
+        let mut shaders = TypedStore::<ShaderTag, ShaderAsset>::with_capacity(SHADERS.len());
 
         for entry in TEXTURES {
             let path = assets_root.join(entry.path);
             textures
-                .insert(entry.uid, TextureAsset::load(&path).expect("load texture asset"))
+                .insert(
+                    entry.uid,
+                    TextureAsset::load(&path).expect("load texture asset"),
+                )
                 .expect("duplicate texture uid");
+        }
+
+        for entry in MAPS {
+            let path = assets_root.join(entry.path);
+            maps.insert(entry.uid, MapAsset::load(&path).expect("load map asset"))
+                .expect("duplicate map uid");
+        }
+
+        for entry in SHADERS {
+            shaders
+                .insert(
+                    entry.uid,
+                    ShaderAsset::load_pair(
+                        &assets_root.join(entry.vert),
+                        &assets_root.join(entry.frag),
+                    )
+                    .expect("load shader asset"),
+                )
+                .expect("duplicate shader uid");
         }
 
         Self {
             assets_root,
             textures,
+            maps,
+            shaders,
         }
     }
 
@@ -35,6 +65,14 @@ impl ResourceManager {
 
     pub fn texture(&self, uid: TextureUid) -> &TextureAsset {
         self.textures.get(uid)
+    }
+
+    pub fn map(&self, uid: MapUid) -> &MapAsset {
+        self.maps.get(uid)
+    }
+
+    pub fn shader(&self, uid: ShaderUid) -> &ShaderAsset {
+        self.shaders.get(uid)
     }
 }
 
@@ -88,5 +126,7 @@ impl<M, T> TypedStore<M, T> {
 pub trait ResourceMarker {}
 
 impl ResourceMarker for TextureTag {}
+impl ResourceMarker for MapTag {}
+impl ResourceMarker for ShaderTag {}
 
 pub type ResourceUidFor<M> = crate::resources::uid::ResourceUid<M>;
