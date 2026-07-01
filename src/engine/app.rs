@@ -4,17 +4,18 @@ use std::time::Instant;
 use crate::render::RaycastScene;
 use crate::resources::manager::ResourceManager;
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, KeyEvent, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event::{DeviceEvent, ElementState, KeyEvent, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, DeviceEvents, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::WindowId;
+use winit::window::{CursorGrabMode, WindowId};
 
 use crate::engine::window::{EngineConfig, WindowContext};
-use crate::game::{default_player, Player, MOVE_SPEED, ROTATE_SPEED};
+use crate::game::{default_player, Player, MOVE_SPEED, MOUSE_SENSITIVITY, ROTATE_SPEED, STRAFE_SPEED};
 use crate::resources::assets::{map, shader, texture};
 
 pub fn run() -> Result<(), winit::error::EventLoopError> {
     let event_loop = EventLoop::new()?;
+    event_loop.listen_device_events(DeviceEvents::WhenFocused);
     let mut app = App::new();
     event_loop.run_app(&mut app)
 }
@@ -25,6 +26,7 @@ struct App {
     player: Player,
     keys: HashSet<KeyCode>,
     last_frame: Instant,
+    mouse_look: bool,
 }
 
 impl App {
@@ -35,6 +37,7 @@ impl App {
             player: default_player(),
             keys: HashSet::new(),
             last_frame: Instant::now(),
+            mouse_look: false,
         }
     }
 
@@ -47,7 +50,22 @@ impl App {
         let mut window =
             WindowContext::create(event_loop, &EngineConfig::default(), raycast_shader);
         self.upload_gpu_resources(&mut window);
+        Self::capture_mouse(&window);
+        self.mouse_look = true;
         self.window = Some(window);
+    }
+
+    fn capture_mouse(window: &WindowContext) {
+        window
+            .window
+            .set_cursor_grab(CursorGrabMode::Locked)
+            .expect("capture mouse");
+        window.window.set_cursor_visible(false);
+    }
+
+    fn release_mouse(window: &WindowContext) {
+        let _ = window.window.set_cursor_grab(CursorGrabMode::None);
+        window.window.set_cursor_visible(true);
     }
 
     fn upload_gpu_resources(&mut self, window: &mut WindowContext) {
@@ -63,10 +81,12 @@ impl App {
     }
 
     fn update(&mut self, dt: f32) {
-        let rotate = (self.key_down(KeyCode::ArrowLeft) as i32
-            - self.key_down(KeyCode::ArrowRight) as i32) as f32;
-        if rotate != 0.0 {
-            self.player.rotate(-rotate * ROTATE_SPEED * dt);
+        if !self.mouse_look {
+            let rotate = (self.key_down(KeyCode::ArrowLeft) as i32
+                - self.key_down(KeyCode::ArrowRight) as i32) as f32;
+            if rotate != 0.0 {
+                self.player.rotate(-rotate * ROTATE_SPEED * dt);
+            }
         }
 
         let forward = (self.key_down(KeyCode::KeyW) as i32 - self.key_down(KeyCode::KeyS) as i32)
@@ -80,6 +100,7 @@ impl App {
                 forward,
                 strafe,
                 MOVE_SPEED * dt,
+                STRAFE_SPEED * dt,
             );
         }
     }
@@ -119,6 +140,17 @@ impl ApplicationHandler for App {
     ) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Focused(focused) => {
+                if let Some(window) = self.window.as_ref() {
+                    if focused {
+                        Self::capture_mouse(window);
+                        self.mouse_look = true;
+                    } else {
+                        Self::release_mouse(window);
+                        self.mouse_look = false;
+                    }
+                }
+            }
             WindowEvent::Resized(size) => {
                 if let Some(window) = self.window.as_mut() {
                     window.resize(size.width as i32, size.height as i32);
@@ -146,6 +178,21 @@ impl ApplicationHandler for App {
                 self.render();
             }
             _ => {}
+        }
+    }
+
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: winit::event::DeviceId,
+        event: DeviceEvent,
+    ) {
+        if !self.mouse_look {
+            return;
+        }
+
+        if let DeviceEvent::MouseMotion { delta } = event {
+            self.player.rotate((delta.0 as f32) * MOUSE_SENSITIVITY);
         }
     }
 

@@ -29,9 +29,16 @@ impl Player {
         self.plane = Vec2::new(-self.dir.y, self.dir.x) * 0.66;
     }
 
-    pub fn move_relative(&mut self, map: &MapAsset, forward: f32, strafe: f32, move_speed: f32) {
-        let velocity = self.dir * forward + Vec2::new(-self.dir.y, self.dir.x) * strafe;
-        let velocity = velocity * move_speed;
+    pub fn move_relative(
+        &mut self,
+        map: &MapAsset,
+        forward: f32,
+        strafe: f32,
+        forward_speed: f32,
+        strafe_speed: f32,
+    ) {
+        let velocity =
+            self.dir * forward * forward_speed + Vec2::new(-self.dir.y, self.dir.x) * strafe * strafe_speed;
 
         let new_x = self.pos.x + velocity.x;
         if !map.is_wall(new_x, self.pos.y) {
@@ -50,6 +57,8 @@ impl Player {
 
 pub const ROTATE_SPEED: f32 = 2.5;
 pub const MOVE_SPEED: f32 = 3.5;
+pub const STRAFE_SPEED: f32 = 2.0;
+pub const MOUSE_SENSITIVITY: f32 = 0.0015;
 
 pub fn default_player() -> Player {
     Player::new(2.5, 2.5, 0.0)
