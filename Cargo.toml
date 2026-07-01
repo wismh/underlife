@@ -1,0 +1,18 @@
+[package]
+name = "pseudo3d"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+winit = "0.30"
+glutin = "0.32"
+glutin-winit = "0.5"
+raw-window-handle = "0.6"
+glow = "0.16"
+glam = "0.29"
+image = { version = "0.25", default-features = false, features = ["png"] }
+thiserror = "2"
+
+[build-dependencies]
+toml = "0.8"

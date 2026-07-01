@@ -1,0 +1,11 @@
+[[texture]]
+name = "brick"
+path = "art/textures/brick.png"
+
+[[texture]]
+name = "floor"
+path = "art/textures/floor.png"
+
+[[texture]]
+name = "sky"
+path = "art/textures/sky.png"
