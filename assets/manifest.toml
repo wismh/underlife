@@ -18,3 +18,12 @@ path = "levels/demo.map"
 name = "raycast"
 vert = "shaders/raycast.vert"
 frag = "shaders/raycast.frag"
+
+[[shader]]
+name = "postprocess"
+vert = "shaders/postprocess.vert"
+frag = "shaders/postprocess.frag"
+
+[[config]]
+name = "postprocess"
+path = "configs/postprocess.toml"

@@ -1,3 +1,7 @@
+mod postprocess;
+
+pub use postprocess::OpenGlPostFx;
+
 use glow::HasContext;
 use glutin::config::GlConfig;
 
@@ -55,6 +59,10 @@ impl OpenGlBackend {
                 u_map_size,
             }
         }
+    }
+
+    pub fn context(&self) -> &glow::Context {
+        &self.gl
     }
 }
 
@@ -219,7 +227,7 @@ pub fn pick_gl_config(
         .expect("no suitable OpenGL config found")
 }
 
-unsafe fn compile_program(
+pub(crate) unsafe fn compile_program(
     gl: &glow::Context,
     vertex_src: &str,
     fragment_src: &str,

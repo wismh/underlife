@@ -13,6 +13,7 @@ glow = "0.16"
 glam = "0.29"
 image = { version = "0.25", default-features = false, features = ["png"] }
 thiserror = "2"
+toml = "0.8"
 
 [build-dependencies]
 toml = "0.8"

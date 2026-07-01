@@ -29,6 +29,14 @@ impl<B: RenderBackend> RaycastRenderer<B> {
         self.backend.resize(width, height);
     }
 
+    pub fn backend(&self) -> &B {
+        &self.backend
+    }
+
+    pub fn backend_mut(&mut self) -> &mut B {
+        &mut self.backend
+    }
+
     pub fn set_wall_texture(&mut self, texture: &TextureAsset) {
         self.wall = Some(self.backend.upload_texture_rgba(texture.as_view()));
     }

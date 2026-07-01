@@ -6,4 +6,4 @@ mod uid;
 
 pub use asset::{Asset, AssetError};
 pub use manager::ResourceManager;
-pub use uid::{MapUid, ResourceUid, ShaderUid, TextureUid};
+pub use uid::{ConfigUid, MapUid, ResourceUid, ShaderUid, TextureUid};

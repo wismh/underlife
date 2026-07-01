@@ -22,6 +22,8 @@ pub enum AssetError {
     },
     #[error("invalid map at {path}: {reason}")]
     InvalidMap { path: String, reason: String },
+    #[error("invalid config at {path}: {reason}")]
+    InvalidConfig { path: String, reason: String },
     #[error("unsupported loader for {kind}: {hint}")]
     UnsupportedLoader { kind: &'static str, hint: &'static str },
     #[error("unknown asset kind: {0}")]

@@ -1,0 +1,6 @@
+[vignette]
+enabled = true
+intensity = 0.25
+smoothness = 0.2
+roundness = 1.0
+rounded = true

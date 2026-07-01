@@ -2,17 +2,19 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
 use crate::resources::asset::Asset;
-use crate::resources::assets::{MAPS, SHADERS, TEXTURES};
+use crate::resources::assets::{CONFIGS, MAPS, SHADERS, TEXTURES};
+use crate::resources::types::config::ConfigAsset;
 use crate::resources::types::map::MapAsset;
 use crate::resources::types::shader::ShaderAsset;
 use crate::resources::types::texture::TextureAsset;
-use crate::resources::uid::{MapTag, MapUid, ShaderTag, ShaderUid, TextureTag, TextureUid};
+use crate::resources::uid::{ConfigTag, ConfigUid, MapTag, MapUid, ShaderTag, ShaderUid, TextureTag, TextureUid};
 
 pub struct ResourceManager {
     assets_root: PathBuf,
     textures: TypedStore<TextureTag, TextureAsset>,
     maps: TypedStore<MapTag, MapAsset>,
     shaders: TypedStore<ShaderTag, ShaderAsset>,
+    configs: TypedStore<ConfigTag, ConfigAsset>,
 }
 
 impl ResourceManager {
@@ -21,6 +23,7 @@ impl ResourceManager {
         let mut textures = TypedStore::<TextureTag, TextureAsset>::with_capacity(TEXTURES.len());
         let mut maps = TypedStore::<MapTag, MapAsset>::with_capacity(MAPS.len());
         let mut shaders = TypedStore::<ShaderTag, ShaderAsset>::with_capacity(SHADERS.len());
+        let mut configs = TypedStore::<ConfigTag, ConfigAsset>::with_capacity(CONFIGS.len());
 
         for entry in TEXTURES {
             let path = assets_root.join(entry.path);
@@ -51,11 +54,22 @@ impl ResourceManager {
                 .expect("duplicate shader uid");
         }
 
+        for entry in CONFIGS {
+            let path = assets_root.join(entry.path);
+            configs
+                .insert(
+                    entry.uid,
+                    ConfigAsset::load(&path).expect("load config asset"),
+                )
+                .expect("duplicate config uid");
+        }
+
         Self {
             assets_root,
             textures,
             maps,
             shaders,
+            configs,
         }
     }
 
@@ -73,6 +87,10 @@ impl ResourceManager {
 
     pub fn shader(&self, uid: ShaderUid) -> &ShaderAsset {
         self.shaders.get(uid)
+    }
+
+    pub fn config(&self, uid: ConfigUid) -> &ConfigAsset {
+        self.configs.get(uid)
     }
 }
 
@@ -128,5 +146,6 @@ pub trait ResourceMarker {}
 impl ResourceMarker for TextureTag {}
 impl ResourceMarker for MapTag {}
 impl ResourceMarker for ShaderTag {}
+impl ResourceMarker for ConfigTag {}
 
 pub type ResourceUidFor<M> = crate::resources::uid::ResourceUid<M>;

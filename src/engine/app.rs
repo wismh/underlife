@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use crate::render::RaycastScene;
+use crate::render::{PostFxSettings, RaycastScene};
 use crate::resources::manager::ResourceManager;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, ElementState, KeyEvent, WindowEvent};
@@ -11,7 +11,7 @@ use winit::window::{CursorGrabMode, WindowId};
 
 use crate::engine::window::{EngineConfig, WindowContext};
 use crate::game::{default_player, HeadBob, Player, MOVE_SPEED, MOUSE_SENSITIVITY, ROTATE_SPEED, STRAFE_SPEED};
-use crate::resources::assets::{map, shader, texture};
+use crate::resources::assets::{config, map, shader, texture};
 
 pub fn run() -> Result<(), winit::error::EventLoopError> {
     let event_loop = EventLoop::new()?;
@@ -28,18 +28,26 @@ struct App {
     keys: HashSet<KeyCode>,
     last_frame: Instant,
     mouse_look: bool,
+    post_fx: PostFxSettings,
 }
 
 impl App {
     fn new() -> Self {
+        let resources = ResourceManager::load_all();
+        let post_fx = resources
+            .config(config::POSTPROCESS)
+            .post_fx()
+            .expect("parse postprocess config");
+
         Self {
             window: None,
-            resources: ResourceManager::load_all(),
+            resources,
             player: default_player(),
             head_bob: HeadBob::new(),
             keys: HashSet::new(),
             last_frame: Instant::now(),
             mouse_look: false,
+            post_fx,
         }
     }
 
@@ -49,8 +57,13 @@ impl App {
         }
 
         let raycast_shader = self.resources.shader(shader::RAYCAST);
-        let mut window =
-            WindowContext::create(event_loop, &EngineConfig::default(), raycast_shader);
+        let post_shader = self.resources.shader(shader::POSTPROCESS);
+        let mut window = WindowContext::create(
+            event_loop,
+            &EngineConfig::default(),
+            raycast_shader,
+            post_shader,
+        );
         self.upload_gpu_resources(&mut window);
         Self::capture_mouse(&window);
         self.mouse_look = true;
@@ -124,7 +137,7 @@ impl App {
             view_bob: [self.head_bob.offset_x, self.head_bob.offset_y],
         };
 
-        window.renderer.draw(&scene);
+        window.renderer.draw(&scene, &self.post_fx);
         window.present();
     }
 

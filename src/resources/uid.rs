@@ -22,6 +22,7 @@ impl<T> ResourceUid<T> {
 pub type TextureUid = ResourceUid<TextureTag>;
 pub type MapUid = ResourceUid<MapTag>;
 pub type ShaderUid = ResourceUid<ShaderTag>;
+pub type ConfigUid = ResourceUid<ConfigTag>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TextureTag;
@@ -31,6 +32,9 @@ pub struct MapTag;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ShaderTag;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ConfigTag;
 
 pub struct TextureManifestEntry {
     pub uid: TextureUid,
@@ -46,4 +50,9 @@ pub struct ShaderManifestEntry {
     pub uid: ShaderUid,
     pub vert: &'static str,
     pub frag: &'static str,
+}
+
+pub struct ConfigManifestEntry {
+    pub uid: ConfigUid,
+    pub path: &'static str,
 }
