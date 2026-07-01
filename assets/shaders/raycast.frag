@@ -7,6 +7,7 @@ out vec4 frag_color;
 uniform vec2 u_resolution;
 uniform vec2 u_player_pos;
 uniform vec2 u_player_dir;
+uniform vec2 u_view_bob;
 
 uniform sampler2D u_map;
 uniform vec2 u_map_size;
@@ -19,8 +20,9 @@ const int MAX_STEPS = 64;
 const float FOG_DISTANCE = 8.0;
 
 void main() {
-    vec2 pos = u_player_pos;
     vec2 dir = u_player_dir;
+    vec2 pos = u_player_pos + vec2(-dir.y, dir.x) * u_view_bob.x;
+    float horizon = u_resolution.y * 0.5 - u_view_bob.y;
 
     float camera_x = 2.0 * gl_FragCoord.x / u_resolution.x - 1.0;
     vec2 plane = vec2(-dir.y, dir.x) * 0.66;
@@ -95,8 +97,8 @@ void main() {
     wall_x -= floor(wall_x);
 
     float line_height = u_resolution.y / perp_wall_dist;
-    float draw_start = -line_height * 0.5 + u_resolution.y * 0.5;
-    float draw_end = line_height * 0.5 + u_resolution.y * 0.5;
+    float draw_start = -line_height * 0.5 + horizon;
+    float draw_end = line_height * 0.5 + horizon;
 
     float y = gl_FragCoord.y;
 
@@ -110,7 +112,7 @@ void main() {
     }
 
     if (y > draw_end) {
-        float p = y - u_resolution.y * 0.5;
+        float p = y - horizon;
         float row_dist = (0.5 * u_resolution.y) / p;
         vec2 floor_world = pos + row_dist * ray_dir;
         vec2 floor_uv = fract(floor_world);
@@ -120,7 +122,7 @@ void main() {
         return;
     }
 
-    float p_ceil = u_resolution.y * 0.5 - y;
+    float p_ceil = horizon - y;
     float row_dist_ceil = (0.5 * u_resolution.y) / p_ceil;
     vec2 ceil_world = pos + row_dist_ceil * ray_dir;
     vec2 ceil_uv = fract(ceil_world);

@@ -10,7 +10,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{CursorGrabMode, WindowId};
 
 use crate::engine::window::{EngineConfig, WindowContext};
-use crate::game::{default_player, Player, MOVE_SPEED, MOUSE_SENSITIVITY, ROTATE_SPEED, STRAFE_SPEED};
+use crate::game::{default_player, HeadBob, Player, MOVE_SPEED, MOUSE_SENSITIVITY, ROTATE_SPEED, STRAFE_SPEED};
 use crate::resources::assets::{map, shader, texture};
 
 pub fn run() -> Result<(), winit::error::EventLoopError> {
@@ -24,6 +24,7 @@ struct App {
     window: Option<WindowContext>,
     resources: ResourceManager,
     player: Player,
+    head_bob: HeadBob,
     keys: HashSet<KeyCode>,
     last_frame: Instant,
     mouse_look: bool,
@@ -35,6 +36,7 @@ impl App {
             window: None,
             resources: ResourceManager::load_all(),
             player: default_player(),
+            head_bob: HeadBob::new(),
             keys: HashSet::new(),
             last_frame: Instant::now(),
             mouse_look: false,
@@ -94,6 +96,9 @@ impl App {
         let strafe =
             (self.key_down(KeyCode::KeyD) as i32 - self.key_down(KeyCode::KeyA) as i32) as f32;
 
+        let bob_speed = glam::Vec2::new(forward * MOVE_SPEED, strafe * MOVE_SPEED).length();
+        self.head_bob.update(dt, bob_speed);
+
         if forward != 0.0 || strafe != 0.0 {
             self.player.move_relative(
                 self.resources.map(map::DEMO),
@@ -116,6 +121,7 @@ impl App {
             height,
             player_pos: [self.player.pos.x, self.player.pos.y],
             player_dir: [self.player.dir.x, self.player.dir.y],
+            view_bob: [self.head_bob.offset_x, self.head_bob.offset_y],
         };
 
         window.renderer.draw(&scene);

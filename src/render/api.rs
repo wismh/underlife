@@ -6,6 +6,8 @@ pub struct RaycastScene {
     pub height: u32,
     pub player_pos: [f32; 2],
     pub player_dir: [f32; 2],
+    /// x: horizontal sway in world units, y: vertical bob in screen pixels
+    pub view_bob: [f32; 2],
 }
 
 #[derive(Debug, Clone, Copy)]

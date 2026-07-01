@@ -13,6 +13,7 @@ pub struct OpenGlBackend {
     u_resolution: glow::NativeUniformLocation,
     u_player_pos: glow::NativeUniformLocation,
     u_player_dir: glow::NativeUniformLocation,
+    u_view_bob: glow::NativeUniformLocation,
     u_map_size: glow::NativeUniformLocation,
 }
 
@@ -27,6 +28,7 @@ impl OpenGlBackend {
             let u_resolution = gl.get_uniform_location(program, "u_resolution").unwrap();
             let u_player_pos = gl.get_uniform_location(program, "u_player_pos").unwrap();
             let u_player_dir = gl.get_uniform_location(program, "u_player_dir").unwrap();
+            let u_view_bob = gl.get_uniform_location(program, "u_view_bob").unwrap();
             let u_map_size = gl.get_uniform_location(program, "u_map_size").unwrap();
 
             let u_map = gl.get_uniform_location(program, "u_map").unwrap();
@@ -49,6 +51,7 @@ impl OpenGlBackend {
                 u_resolution,
                 u_player_pos,
                 u_player_dir,
+                u_view_bob,
                 u_map_size,
             }
         }
@@ -163,6 +166,11 @@ impl RenderBackend for OpenGlBackend {
                 Some(&self.u_player_dir),
                 scene.player_dir[0],
                 scene.player_dir[1],
+            );
+            self.gl.uniform_2_f32(
+                Some(&self.u_view_bob),
+                scene.view_bob[0],
+                scene.view_bob[1],
             );
             self.gl.uniform_2_f32(
                 Some(&self.u_map_size),
