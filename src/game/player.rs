@@ -37,8 +37,13 @@ impl Player {
         forward_speed: f32,
         strafe_speed: f32,
     ) {
-        let velocity =
-            self.dir * forward * forward_speed + Vec2::new(-self.dir.y, self.dir.x) * strafe * strafe_speed;
+        let mut input = Vec2::new(forward, strafe);
+        if input.length_squared() > 1.0 {
+            input = input.normalize();
+        }
+
+        let velocity = self.dir * input.x * forward_speed
+            + Vec2::new(-self.dir.y, self.dir.x) * input.y * strafe_speed;
 
         let new_x = self.pos.x + velocity.x;
         if !map.is_wall(new_x, self.pos.y) {
