@@ -1,0 +1,29 @@
+[spawn]
+x = 2.5
+y = 2.5
+yaw = 0.0
+
+[movement]
+rotate_speed = 2.5
+move_speed = 3
+strafe_speed = 1.5
+mouse_sensitivity = 0.0015
+plane_scale = 0.66
+
+[head_bob]
+walk_phase_base = 4.2
+walk_phase_speed_scale = 1.7
+walk_horiz_phase_offset = 1.1
+walk_vert_base = 9.0
+walk_vert_speed_scale = 2.4
+walk_horiz_scale = 0.013
+walk_horiz_speed_base = 0.7
+walk_horiz_speed_scale = 0.08
+idle_phase_speed = 0.9
+idle_vert_amplitude = 7.5
+idle_horiz_amplitude = 0.009
+idle_horiz_phase_scale = 0.6
+smooth_y_idle = 6.5
+smooth_y_walk = 15.0
+smooth_x_idle = 5.0
+smooth_x_walk = 8.5

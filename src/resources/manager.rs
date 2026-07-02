@@ -2,12 +2,18 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
 use crate::resources::asset::Asset;
-use crate::resources::assets::{CONFIGS, MAPS, SHADERS, TEXTURES};
+use crate::resources::paths;
+use crate::resources::assets::{CONFIGS, MAPS, SHADERS, SOUND_PRESETS, SOUNDS, TEXTURES};
 use crate::resources::types::config::ConfigAsset;
 use crate::resources::types::map::MapAsset;
 use crate::resources::types::shader::ShaderAsset;
+use crate::resources::types::sound::SoundAsset;
+use crate::resources::types::sound_preset::SoundPresetAsset;
 use crate::resources::types::texture::TextureAsset;
-use crate::resources::uid::{ConfigTag, ConfigUid, MapTag, MapUid, ShaderTag, ShaderUid, TextureTag, TextureUid};
+use crate::resources::uid::{
+    ConfigTag, ConfigUid, MapTag, MapUid, ShaderTag, ShaderUid, SoundPresetTag, SoundPresetUid,
+    SoundTag, SoundUid, TextureTag, TextureUid,
+};
 
 pub struct ResourceManager {
     assets_root: PathBuf,
@@ -15,15 +21,21 @@ pub struct ResourceManager {
     maps: TypedStore<MapTag, MapAsset>,
     shaders: TypedStore<ShaderTag, ShaderAsset>,
     configs: TypedStore<ConfigTag, ConfigAsset>,
+    sounds: TypedStore<SoundTag, SoundAsset>,
+    sound_presets: TypedStore<SoundPresetTag, SoundPresetAsset>,
 }
 
 impl ResourceManager {
     pub fn load_all() -> Self {
-        let assets_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
+        let assets_root =
+            paths::resolve_assets_root().expect("locate runtime assets directory");
         let mut textures = TypedStore::<TextureTag, TextureAsset>::with_capacity(TEXTURES.len());
         let mut maps = TypedStore::<MapTag, MapAsset>::with_capacity(MAPS.len());
         let mut shaders = TypedStore::<ShaderTag, ShaderAsset>::with_capacity(SHADERS.len());
         let mut configs = TypedStore::<ConfigTag, ConfigAsset>::with_capacity(CONFIGS.len());
+        let mut sounds = TypedStore::<SoundTag, SoundAsset>::with_capacity(SOUNDS.len());
+        let mut sound_presets =
+            TypedStore::<SoundPresetTag, SoundPresetAsset>::with_capacity(SOUND_PRESETS.len());
 
         for entry in TEXTURES {
             let path = assets_root.join(entry.path);
@@ -64,12 +76,31 @@ impl ResourceManager {
                 .expect("duplicate config uid");
         }
 
+        for entry in SOUNDS {
+            let path = assets_root.join(entry.path);
+            sounds
+                .insert(entry.uid, SoundAsset::load(&path).expect("load sound asset"))
+                .expect("duplicate sound uid");
+        }
+
+        for entry in SOUND_PRESETS {
+            let path = assets_root.join(entry.path);
+            sound_presets
+                .insert(
+                    entry.uid,
+                    SoundPresetAsset::load(&path).expect("load sound preset asset"),
+                )
+                .expect("duplicate sound preset uid");
+        }
+
         Self {
             assets_root,
             textures,
             maps,
             shaders,
             configs,
+            sounds,
+            sound_presets,
         }
     }
 
@@ -91,6 +122,21 @@ impl ResourceManager {
 
     pub fn config(&self, uid: ConfigUid) -> &ConfigAsset {
         self.configs.get(uid)
+    }
+
+    pub fn sound(&self, uid: SoundUid) -> &SoundAsset {
+        self.sounds.get(uid)
+    }
+
+    pub fn sound_preset(&self, uid: SoundPresetUid) -> &SoundPresetAsset {
+        self.sound_presets.get(uid)
+    }
+
+    pub fn sound_by_name(&self, name: &str) -> Option<SoundUid> {
+        SOUNDS
+            .iter()
+            .find(|entry| entry.name == name)
+            .map(|entry| entry.uid)
     }
 }
 
@@ -147,5 +193,7 @@ impl ResourceMarker for TextureTag {}
 impl ResourceMarker for MapTag {}
 impl ResourceMarker for ShaderTag {}
 impl ResourceMarker for ConfigTag {}
+impl ResourceMarker for SoundTag {}
+impl ResourceMarker for SoundPresetTag {}
 
 pub type ResourceUidFor<M> = crate::resources::uid::ResourceUid<M>;

@@ -1,0 +1,4 @@
+clip = "footsteps"
+volume = 0.55
+pitch_min = 0.8
+pitch_max = 3.0

@@ -1,21 +1,28 @@
 use glam::Vec2;
 
+use crate::game::config::MovementConfig;
 use crate::resources::types::map::MapAsset;
 
 pub struct Player {
     pub pos: Vec2,
     pub dir: Vec2,
     pub plane: Vec2,
+    plane_scale: f32,
 }
 
 impl Player {
-    pub fn new(x: f32, y: f32, yaw: f32) -> Self {
+    pub fn from_spawn(spawn: crate::game::config::SpawnConfig, movement: MovementConfig) -> Self {
+        Self::new(spawn.x, spawn.y, spawn.yaw, movement.plane_scale)
+    }
+
+    pub fn new(x: f32, y: f32, yaw: f32, plane_scale: f32) -> Self {
         let dir = Vec2::new(yaw.cos(), yaw.sin());
-        let plane = Vec2::new(-dir.y, dir.x) * 0.66;
+        let plane = Vec2::new(-dir.y, dir.x) * plane_scale;
         Self {
             pos: Vec2::new(x, y),
             dir,
             plane,
+            plane_scale,
         }
     }
 
@@ -26,7 +33,7 @@ impl Player {
             self.dir.x * cos - self.dir.y * sin,
             self.dir.x * sin + self.dir.y * cos,
         );
-        self.plane = Vec2::new(-self.dir.y, self.dir.x) * 0.66;
+        self.plane = Vec2::new(-self.dir.y, self.dir.x) * self.plane_scale;
     }
 
     pub fn move_relative(
@@ -58,13 +65,4 @@ impl Player {
         self.pos.x = self.pos.x.clamp(0.25, map.width_f32() - 1.25);
         self.pos.y = self.pos.y.clamp(0.25, map.height_f32() - 1.25);
     }
-}
-
-pub const ROTATE_SPEED: f32 = 2.5;
-pub const MOVE_SPEED: f32 = 3.5;
-pub const STRAFE_SPEED: f32 = 2.0;
-pub const MOUSE_SENSITIVITY: f32 = 0.0015;
-
-pub fn default_player() -> Player {
-    Player::new(2.5, 2.5, 0.0)
 }

@@ -27,3 +27,23 @@ frag = "shaders/postprocess.frag"
 [[config]]
 name = "postprocess"
 path = "configs/postprocess.toml"
+
+[[config]]
+name = "player"
+path = "configs/player.toml"
+
+[[sound_preset]]
+name = "footsteps"
+path = "configs/sounds/footsteps.toml"
+
+[[sound_preset]]
+name = "music"
+path = "configs/sounds/music.toml"
+
+[[sound]]
+name = "footsteps"
+path = "audio/footsteps.ogg"
+
+[[sound]]
+name = "music"
+path = "audio/music.mp3"

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
+use crate::audio::{AudioEngine, LoopHandle, PlayParams, SoundSource};
 use crate::render::{PostFxSettings, RaycastScene};
 use crate::resources::manager::ResourceManager;
 use winit::application::ApplicationHandler;
@@ -10,8 +11,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{CursorGrabMode, WindowId};
 
 use crate::engine::window::{EngineConfig, WindowContext};
-use crate::game::{default_player, HeadBob, Player, MOVE_SPEED, MOUSE_SENSITIVITY, ROTATE_SPEED, STRAFE_SPEED};
-use crate::resources::assets::{config, map, shader, texture};
+use crate::game::{HeadBob, Player, PlayerConfig};
+use crate::resources::assets::{config, map, shader, sound_preset, texture};
 
 pub fn run() -> Result<(), winit::error::EventLoopError> {
     let event_loop = EventLoop::new()?;
@@ -23,12 +24,15 @@ pub fn run() -> Result<(), winit::error::EventLoopError> {
 struct App {
     window: Option<WindowContext>,
     resources: ResourceManager,
+    audio: AudioEngine,
     player: Player,
     head_bob: HeadBob,
     keys: HashSet<KeyCode>,
     last_frame: Instant,
     mouse_look: bool,
     post_fx: PostFxSettings,
+    footstep_loop: LoopHandle,
+    player_cfg: PlayerConfig,
 }
 
 impl App {
@@ -38,16 +42,23 @@ impl App {
             .config(config::POSTPROCESS)
             .post_fx()
             .expect("parse postprocess config");
+        let player_cfg = PlayerConfig::load(resources.config(config::PLAYER))
+            .expect("parse player config");
+        let mut audio = AudioEngine::new(&resources).expect("init audio engine");
+        let footstep_loop = audio.create_loop_handle();
 
         Self {
             window: None,
             resources,
-            player: default_player(),
+            audio,
+            player: Player::from_spawn(player_cfg.spawn, player_cfg.movement),
             head_bob: HeadBob::new(),
             keys: HashSet::new(),
             last_frame: Instant::now(),
             mouse_look: false,
             post_fx,
+            footstep_loop,
+            player_cfg,
         }
     }
 
@@ -67,6 +78,11 @@ impl App {
         self.upload_gpu_resources(&mut window);
         Self::capture_mouse(&window);
         self.mouse_look = true;
+        self.audio.play_music(
+            SoundSource::Preset(sound_preset::MUSIC),
+            true,
+            Some(Duration::from_secs(2)),
+        );
         self.window = Some(window);
     }
 
@@ -96,11 +112,14 @@ impl App {
     }
 
     fn update(&mut self, dt: f32) {
+        let movement = self.player_cfg.movement;
+        let head_bob = self.player_cfg.head_bob;
+
         if !self.mouse_look {
             let rotate = (self.key_down(KeyCode::ArrowLeft) as i32
                 - self.key_down(KeyCode::ArrowRight) as i32) as f32;
             if rotate != 0.0 {
-                self.player.rotate(-rotate * ROTATE_SPEED * dt);
+                self.player.rotate(-rotate * movement.rotate_speed * dt);
             }
         }
 
@@ -109,18 +128,34 @@ impl App {
         let strafe =
             (self.key_down(KeyCode::KeyD) as i32 - self.key_down(KeyCode::KeyA) as i32) as f32;
 
-        let bob_speed = glam::Vec2::new(forward * MOVE_SPEED, strafe * MOVE_SPEED).length();
-        self.head_bob.update(dt, bob_speed);
+        let bob_speed =
+            glam::Vec2::new(forward * movement.move_speed, strafe * movement.move_speed).length();
+        self.head_bob
+            .update(dt, bob_speed, head_bob, movement);
 
         if forward != 0.0 || strafe != 0.0 {
             self.player.move_relative(
                 self.resources.map(map::DEMO),
                 forward,
                 strafe,
-                MOVE_SPEED * dt,
-                STRAFE_SPEED * dt,
+                movement.move_speed * dt,
+                movement.strafe_speed * dt,
             );
         }
+
+        let moving = forward != 0.0 || strafe != 0.0;
+        self.audio.update_loop(
+            self.footstep_loop,
+            moving,
+            SoundSource::Preset(sound_preset::FOOTSTEPS),
+            PlayParams::default(),
+        );
+
+        self.audio.set_listener(
+            glam::Vec3::new(self.player.pos.x, self.player.pos.y, 0.0),
+            glam::Vec3::new(self.player.dir.x, self.player.dir.y, 0.0),
+        );
+        self.audio.update(dt);
     }
 
     fn render(&mut self) {
@@ -211,7 +246,9 @@ impl ApplicationHandler for App {
         }
 
         if let DeviceEvent::MouseMotion { delta } = event {
-            self.player.rotate((delta.0 as f32) * MOUSE_SENSITIVITY);
+            self.player.rotate(
+                (delta.0 as f32) * self.player_cfg.movement.mouse_sensitivity,
+            );
         }
     }
 

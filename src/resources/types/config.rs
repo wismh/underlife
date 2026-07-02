@@ -25,7 +25,11 @@ impl ConfigAsset {
         })
     }
 
-    fn section(&self, key: &str) -> Result<&toml::map::Map<String, Value>, AssetError> {
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub(crate) fn section(&self, key: &str) -> Result<&toml::map::Map<String, Value>, AssetError> {
         self.root.get(key).and_then(|value| value.as_table()).ok_or_else(|| {
             AssetError::InvalidConfig {
                 path: self.path.clone(),

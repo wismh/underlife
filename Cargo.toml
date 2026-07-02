@@ -14,6 +14,9 @@ glam = "0.29"
 image = { version = "0.25", default-features = false, features = ["png"] }
 thiserror = "2"
 toml = "0.8"
+kira = { version = "0.12", features = ["cpal"] }
+rand = "0.10.1"
+mint = "0.5.9"
 
 [build-dependencies]
 toml = "0.8"

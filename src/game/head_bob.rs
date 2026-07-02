@@ -1,3 +1,5 @@
+use crate::game::config::{HeadBobConfig, MovementConfig};
+
 #[derive(Debug, Clone, Copy)]
 pub struct HeadBob {
     walk_phase: f32,
@@ -16,26 +18,35 @@ impl HeadBob {
         }
     }
 
-    pub fn update(&mut self, dt: f32, bob_speed: f32) {
-        self.walk_phase += dt * (4.2 + bob_speed * 1.7);
-        self.idle_phase += dt * 0.9;
+    pub fn update(
+        &mut self,
+        dt: f32,
+        bob_speed: f32,
+        cfg: HeadBobConfig,
+        movement: MovementConfig,
+    ) {
+        self.walk_phase += dt * (cfg.walk_phase_base + bob_speed * cfg.walk_phase_speed_scale);
+        self.idle_phase += dt * cfg.idle_phase_speed;
 
         let walk_sin = self.walk_phase.sin();
         let walk_vert = walk_sin * walk_sin.abs();
-        let walk_horiz = (self.walk_phase + 1.1).sin();
+        let walk_horiz = (self.walk_phase + cfg.walk_horiz_phase_offset).sin();
 
-        let walk_target_y = walk_vert * (9.0 + bob_speed * 2.4);
-        let walk_target_x = walk_horiz * 0.013 * (0.7 + bob_speed * 0.08);
+        let walk_target_y = walk_vert * (cfg.walk_vert_base + bob_speed * cfg.walk_vert_speed_scale);
+        let walk_target_x = walk_horiz
+            * cfg.walk_horiz_scale
+            * (cfg.walk_horiz_speed_base + bob_speed * cfg.walk_horiz_speed_scale);
 
-        let idle_target_y = self.idle_phase.sin() * 7.5;
-        let idle_target_x = (self.idle_phase * 0.6).sin() * 0.009;
+        let idle_target_y = self.idle_phase.sin() * cfg.idle_vert_amplitude;
+        let idle_target_x =
+            (self.idle_phase * cfg.idle_horiz_phase_scale).sin() * cfg.idle_horiz_amplitude;
 
-        let walk_blend = smoothstep(0.0, 1.0, bob_speed / MOVE_SPEED);
+        let walk_blend = smoothstep(0.0, 1.0, bob_speed / movement.move_speed);
         let target_y = lerp(idle_target_y, walk_target_y, walk_blend);
         let target_x = lerp(idle_target_x, walk_target_x, walk_blend);
 
-        let smooth_y = lerp(6.5, 15.0, walk_blend);
-        let smooth_x = lerp(5.0, 8.5, walk_blend);
+        let smooth_y = lerp(cfg.smooth_y_idle, cfg.smooth_y_walk, walk_blend);
+        let smooth_x = lerp(cfg.smooth_x_idle, cfg.smooth_x_walk, walk_blend);
         self.offset_y = approach(self.offset_y, target_y, dt, smooth_y);
         self.offset_x = approach(self.offset_x, target_x, dt, smooth_x);
     }
@@ -46,8 +57,6 @@ impl Default for HeadBob {
         Self::new()
     }
 }
-
-const MOVE_SPEED: f32 = 3.5;
 
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t

@@ -1,0 +1,4 @@
+clip = "music"
+volume = 0.32
+pitch_min = 1.0
+pitch_max = 1.0

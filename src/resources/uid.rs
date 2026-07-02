@@ -23,6 +23,8 @@ pub type TextureUid = ResourceUid<TextureTag>;
 pub type MapUid = ResourceUid<MapTag>;
 pub type ShaderUid = ResourceUid<ShaderTag>;
 pub type ConfigUid = ResourceUid<ConfigTag>;
+pub type SoundUid = ResourceUid<SoundTag>;
+pub type SoundPresetUid = ResourceUid<SoundPresetTag>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TextureTag;
@@ -35,6 +37,12 @@ pub struct ShaderTag;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ConfigTag;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SoundTag;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SoundPresetTag;
 
 pub struct TextureManifestEntry {
     pub uid: TextureUid,
@@ -54,5 +62,17 @@ pub struct ShaderManifestEntry {
 
 pub struct ConfigManifestEntry {
     pub uid: ConfigUid,
+    pub path: &'static str,
+}
+
+pub struct SoundManifestEntry {
+    pub uid: SoundUid,
+    pub name: &'static str,
+    pub path: &'static str,
+}
+
+pub struct SoundPresetManifestEntry {
+    pub uid: SoundPresetUid,
+    pub name: &'static str,
     pub path: &'static str,
 }
