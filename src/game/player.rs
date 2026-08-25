@@ -66,3 +66,51 @@ impl Player {
         self.pos.y = self.pos.y.clamp(0.25, map.height_f32() - 1.25);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::resources::types::map::MapAsset;
+    use crate::resources::Asset;
+    use std::path::PathBuf;
+
+    fn demo_map() -> MapAsset {
+        MapAsset::load(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/levels/demo.map"))
+            .expect("demo.map")
+    }
+
+    #[test]
+    fn plane_is_perpendicular_to_dir_scaled_by_plane_scale() {
+        let player = Player::new(2.5, 2.5, 0.0, 0.66);
+        assert!((player.dir.x - 1.0).abs() < 1e-5);
+        assert!(player.dir.y.abs() < 1e-5);
+        assert!(player.dir.dot(player.plane).abs() < 1e-5);
+        assert!((player.plane.y - 0.66).abs() < 1e-5);
+    }
+
+    #[test]
+    fn move_relative_does_not_walk_through_walls() {
+        let map = demo_map();
+        // Cell (1,1) is empty; cell (0,*) is `#`.
+        let mut player = Player::new(1.5, 1.5, std::f32::consts::PI, 0.66);
+        let start = player.pos;
+        player.move_relative(&map, 1.0, 0.0, 5.0, 0.0);
+        assert!(
+            player.pos.x > 1.0,
+            "player walked through the west wall: {:?} -> {:?}",
+            start,
+            player.pos
+        );
+        assert!((player.pos.x - start.x).abs() < 1e-4);
+        assert!(!map.is_wall(player.pos.x, player.pos.y));
+    }
+
+    #[test]
+    fn move_relative_advances_into_open_space() {
+        let map = demo_map();
+        let mut player = Player::new(2.5, 2.5, 0.0, 0.66);
+        player.move_relative(&map, 1.0, 0.0, 0.4, 0.0);
+        assert!((player.pos.x - 2.9).abs() < 1e-4);
+        assert!((player.pos.y - 2.5).abs() < 1e-4);
+    }
+}

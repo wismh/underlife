@@ -7,6 +7,7 @@ out vec4 frag_color;
 uniform vec2 u_resolution;
 uniform vec2 u_player_pos;
 uniform vec2 u_player_dir;
+uniform vec2 u_player_plane;
 uniform vec2 u_view_bob;
 
 uniform sampler2D u_map;
@@ -25,7 +26,7 @@ void main() {
     float horizon = u_resolution.y * 0.5 - u_view_bob.y;
 
     float camera_x = 2.0 * gl_FragCoord.x / u_resolution.x - 1.0;
-    vec2 plane = vec2(-dir.y, dir.x) * 0.66;
+    vec2 plane = u_player_plane;
     vec2 ray_dir = dir + plane * camera_x;
 
     int map_x = int(pos.x);

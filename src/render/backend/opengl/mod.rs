@@ -2,27 +2,42 @@ mod postprocess;
 
 pub use postprocess::OpenGlPostFx;
 
+use std::rc::Rc;
+
 use glow::HasContext;
 use glutin::config::GlConfig;
 
 use crate::render::api::{MapView, RaycastScene, RenderBackend, TextureView};
 use crate::resources::types::shader::ShaderAsset;
 
-pub struct GlTexture(glow::NativeTexture);
+pub struct GlTexture {
+    gl: Rc<glow::Context>,
+    id: glow::NativeTexture,
+}
+
+impl Drop for GlTexture {
+    fn drop(&mut self) {
+        unsafe {
+            self.gl.delete_texture(self.id);
+        }
+    }
+}
 
 pub struct OpenGlBackend {
-    gl: glow::Context,
+    gl: Rc<glow::Context>,
     program: glow::NativeProgram,
     vao: glow::NativeVertexArray,
     u_resolution: glow::NativeUniformLocation,
     u_player_pos: glow::NativeUniformLocation,
     u_player_dir: glow::NativeUniformLocation,
+    u_player_plane: glow::NativeUniformLocation,
     u_view_bob: glow::NativeUniformLocation,
     u_map_size: glow::NativeUniformLocation,
 }
 
 impl OpenGlBackend {
     pub fn new(gl: glow::Context, shader: &ShaderAsset) -> Self {
+        let gl = Rc::new(gl);
         unsafe {
             let program = compile_program(&gl, &shader.vertex, &shader.fragment);
 
@@ -32,6 +47,7 @@ impl OpenGlBackend {
             let u_resolution = gl.get_uniform_location(program, "u_resolution").unwrap();
             let u_player_pos = gl.get_uniform_location(program, "u_player_pos").unwrap();
             let u_player_dir = gl.get_uniform_location(program, "u_player_dir").unwrap();
+            let u_player_plane = gl.get_uniform_location(program, "u_player_plane").unwrap();
             let u_view_bob = gl.get_uniform_location(program, "u_view_bob").unwrap();
             let u_map_size = gl.get_uniform_location(program, "u_map_size").unwrap();
 
@@ -55,6 +71,7 @@ impl OpenGlBackend {
                 u_resolution,
                 u_player_pos,
                 u_player_dir,
+                u_player_plane,
                 u_view_bob,
                 u_map_size,
             }
@@ -63,6 +80,13 @@ impl OpenGlBackend {
 
     pub fn context(&self) -> &glow::Context {
         &self.gl
+    }
+
+    fn wrap_texture(&self, id: glow::NativeTexture) -> GlTexture {
+        GlTexture {
+            gl: Rc::clone(&self.gl),
+            id,
+        }
     }
 }
 
@@ -112,7 +136,7 @@ impl RenderBackend for OpenGlBackend {
                 glow::UNSIGNED_BYTE,
                 glow::PixelUnpackData::Slice(Some(view.rgba)),
             );
-            GlTexture(texture)
+            self.wrap_texture(texture)
         }
     }
 
@@ -120,10 +144,16 @@ impl RenderBackend for OpenGlBackend {
         unsafe {
             let texture = self.gl.create_texture().expect("create map texture");
             self.gl.bind_texture(glow::TEXTURE_2D, Some(texture));
-            self.gl
-                .tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, glow::NEAREST as i32);
-            self.gl
-                .tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, glow::NEAREST as i32);
+            self.gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MIN_FILTER,
+                glow::NEAREST as i32,
+            );
+            self.gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MAG_FILTER,
+                glow::NEAREST as i32,
+            );
             self.gl.tex_parameter_i32(
                 glow::TEXTURE_2D,
                 glow::TEXTURE_WRAP_S,
@@ -145,7 +175,7 @@ impl RenderBackend for OpenGlBackend {
                 glow::UNSIGNED_BYTE,
                 glow::PixelUnpackData::Slice(Some(cells)),
             );
-            GlTexture(texture)
+            self.wrap_texture(texture)
         }
     }
 
@@ -175,10 +205,12 @@ impl RenderBackend for OpenGlBackend {
                 scene.player_dir[1],
             );
             self.gl.uniform_2_f32(
-                Some(&self.u_view_bob),
-                scene.view_bob[0],
-                scene.view_bob[1],
+                Some(&self.u_player_plane),
+                scene.player_plane[0],
+                scene.player_plane[1],
             );
+            self.gl
+                .uniform_2_f32(Some(&self.u_view_bob), scene.view_bob[0], scene.view_bob[1]);
             self.gl.uniform_2_f32(
                 Some(&self.u_map_size),
                 map_size.width as f32,
@@ -186,13 +218,13 @@ impl RenderBackend for OpenGlBackend {
             );
 
             self.gl.active_texture(glow::TEXTURE0);
-            self.gl.bind_texture(glow::TEXTURE_2D, Some(map.0));
+            self.gl.bind_texture(glow::TEXTURE_2D, Some(map.id));
             self.gl.active_texture(glow::TEXTURE1);
-            self.gl.bind_texture(glow::TEXTURE_2D, Some(wall.0));
+            self.gl.bind_texture(glow::TEXTURE_2D, Some(wall.id));
             self.gl.active_texture(glow::TEXTURE2);
-            self.gl.bind_texture(glow::TEXTURE_2D, Some(floor.0));
+            self.gl.bind_texture(glow::TEXTURE_2D, Some(floor.id));
             self.gl.active_texture(glow::TEXTURE3);
-            self.gl.bind_texture(glow::TEXTURE_2D, Some(ceiling.0));
+            self.gl.bind_texture(glow::TEXTURE_2D, Some(ceiling.id));
 
             self.gl.draw_arrays(glow::TRIANGLES, 0, 3);
         }
@@ -241,10 +273,7 @@ pub(crate) unsafe fn compile_program(
     gl.link_program(program);
 
     if !gl.get_program_link_status(program) {
-        panic!(
-            "Program link error: {}",
-            gl.get_program_info_log(program)
-        );
+        panic!("Program link error: {}", gl.get_program_info_log(program));
     }
 
     gl.delete_shader(vertex);

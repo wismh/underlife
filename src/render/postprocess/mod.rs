@@ -1,3 +1,3 @@
 mod api;
 
-pub use api::{PostFxSettings, PostProcessBackend, VignetteSettings};
+pub use api::{PostFxSettings, VignetteSettings};

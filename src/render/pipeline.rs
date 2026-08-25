@@ -1,6 +1,6 @@
 use crate::render::api::RaycastScene;
 use crate::render::backend::opengl::{OpenGlBackend, OpenGlPostFx};
-use crate::render::postprocess::{PostFxSettings, PostProcessBackend};
+use crate::render::postprocess::PostFxSettings;
 use crate::render::raycast::RaycastRenderer;
 use crate::resources::types::map::MapAsset;
 use crate::resources::types::shader::ShaderAsset;
@@ -12,11 +12,7 @@ pub struct RenderPipeline {
 }
 
 impl RenderPipeline {
-    pub fn new(
-        gl: glow::Context,
-        raycast_shader: &ShaderAsset,
-        post_shader: &ShaderAsset,
-    ) -> Self {
+    pub fn new(gl: glow::Context, raycast_shader: &ShaderAsset, post_shader: &ShaderAsset) -> Self {
         let backend = OpenGlBackend::new(gl, raycast_shader);
         let post = OpenGlPostFx::new(backend.context(), post_shader);
         Self {
@@ -48,8 +44,7 @@ impl RenderPipeline {
     }
 
     pub fn draw(&mut self, scene: &RaycastScene, post_fx: &PostFxSettings) {
-        self.post
-            .begin_scene_pass(self.raycast.backend().context());
+        self.post.begin_scene_pass(self.raycast.backend().context());
         self.raycast.draw(scene);
         self.post.apply_postprocess(
             self.raycast.backend().context(),

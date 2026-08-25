@@ -1,7 +1,6 @@
 use glam::Vec3;
 
 use crate::audio::api::SpatialParams;
-use crate::audio::volume::linear_to_decibels;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ListenerState {
@@ -39,9 +38,5 @@ pub fn spatial_attenuation(listener: ListenerState, params: SpatialParams) -> Sp
         0.5
     };
 
-    let _ = linear_to_decibels(volume_linear);
-    SpatialAttenuation {
-        volume_linear,
-        pan,
-    }
+    SpatialAttenuation { volume_linear, pan }
 }

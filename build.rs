@@ -11,10 +11,9 @@ fn main() {
     let assets_manifest = manifest_dir.join("assets/manifest.toml");
     println!("cargo:rerun-if-changed={}", assets_manifest.display());
 
-    let manifest: toml::Value = toml::from_str(
-        &fs::read_to_string(&assets_manifest).expect("read assets/manifest.toml"),
-    )
-    .expect("parse assets/manifest.toml");
+    let manifest: toml::Value =
+        toml::from_str(&fs::read_to_string(&assets_manifest).expect("read assets/manifest.toml"))
+            .expect("parse assets/manifest.toml");
 
     let texture_section = generate_texture_section(
         manifest

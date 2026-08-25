@@ -27,9 +27,14 @@ pub enum AssetError {
     #[error("invalid sound at {path}: {reason}")]
     InvalidSound { path: String, reason: String },
     #[error("unsupported loader for {kind}: {hint}")]
-    UnsupportedLoader { kind: &'static str, hint: &'static str },
+    UnsupportedLoader {
+        kind: &'static str,
+        hint: &'static str,
+    },
     #[error("unknown asset kind: {0}")]
     UnknownKind(String),
     #[error("could not locate assets directory: {reason}")]
     AssetsRootNotFound { reason: String },
+    #[error("duplicate {kind} uid {index}")]
+    DuplicateUid { kind: &'static str, index: u32 },
 }

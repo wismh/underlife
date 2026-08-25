@@ -1,3 +1,6 @@
 fn main() {
-    pseudo3d::run().expect("engine run failed");
+    if let Err(error) = pseudo3d::run() {
+        eprintln!("error: {error}");
+        std::process::exit(1);
+    }
 }
