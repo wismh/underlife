@@ -2,18 +2,18 @@ use std::ffi::CString;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
+use crate::render::backend::opengl::pick_gl_config;
+use crate::render::RenderPipeline;
+use crate::resources::types::shader::ShaderAsset;
 use glutin::config::ConfigTemplateBuilder;
-use glutin::context::{ContextAttributesBuilder, ContextApi, Version};
+use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
 use glutin::display::GetGlDisplay;
 use glutin::display::GlDisplay;
 use glutin::prelude::*;
 use glutin::surface::{GlSurface, Surface, SwapInterval, WindowSurface};
 use raw_window_handle::HasWindowHandle;
-use crate::render::backend::opengl::pick_gl_config;
-use crate::render::RenderPipeline;
-use crate::resources::types::shader::ShaderAsset;
 use winit::event_loop::ActiveEventLoop;
-use winit::window::Window;
+use winit::window::{CursorGrabMode, Window};
 
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
@@ -33,10 +33,11 @@ impl Default for EngineConfig {
 }
 
 pub struct WindowContext {
-    pub window: Arc<Window>,
+    // Renderer first so GL objects are dropped while the glutin context is still current.
+    pub renderer: RenderPipeline,
     surface: Surface<WindowSurface>,
     context: glutin::context::PossiblyCurrentContext,
-    pub renderer: RenderPipeline,
+    pub window: Arc<Window>,
 }
 
 impl WindowContext {
@@ -55,11 +56,7 @@ impl WindowContext {
 
         let (window, gl_config) = glutin_winit::DisplayBuilder::new()
             .with_window_attributes(Some(window_attributes))
-            .build(
-                event_loop,
-                ConfigTemplateBuilder::new(),
-                pick_gl_config,
-            )
+            .build(event_loop, ConfigTemplateBuilder::new(), pick_gl_config)
             .expect("create window and OpenGL config");
 
         let window = Arc::new(window.expect("platform did not create a window"));
@@ -94,9 +91,11 @@ impl WindowContext {
             .make_current(&surface)
             .expect("make GL context current");
 
-        surface
-            .set_swap_interval(&context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
-            .expect("set swap interval");
+        if let Err(error) =
+            surface.set_swap_interval(&context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
+        {
+            eprintln!("[engine] vsync/swap interval not set ({error}); continuing");
+        }
 
         let gl = unsafe {
             glow::Context::from_loader_function(|name| {
@@ -109,11 +108,38 @@ impl WindowContext {
         renderer.resize(width, height);
 
         Self {
-            window,
+            renderer,
             surface,
             context,
-            renderer,
+            window,
         }
+    }
+
+    /// Best-effort pointer lock. `Locked` is not available on every display
+    /// (Xvfb, some VNC). Fall back to `Confined`, then no grab, so a frame can still draw.
+    pub fn capture_mouse(&self) {
+        if self.window.set_cursor_grab(CursorGrabMode::Locked).is_ok() {
+            self.window.set_cursor_visible(false);
+            return;
+        }
+
+        eprintln!("[engine] CursorGrabMode::Locked is unsupported; trying Confined");
+        if self
+            .window
+            .set_cursor_grab(CursorGrabMode::Confined)
+            .is_ok()
+        {
+            self.window.set_cursor_visible(false);
+            return;
+        }
+
+        eprintln!("[engine] cursor grab is unsupported; continuing without grab");
+        let _ = self.window.set_cursor_grab(CursorGrabMode::None);
+    }
+
+    pub fn release_mouse(&self) {
+        let _ = self.window.set_cursor_grab(CursorGrabMode::None);
+        self.window.set_cursor_visible(true);
     }
 
     pub fn resize(&mut self, width: i32, height: i32) {

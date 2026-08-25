@@ -1,7 +1,7 @@
 use glow::HasContext;
 
 use super::compile_program;
-use crate::render::postprocess::{PostFxSettings, PostProcessBackend};
+use crate::render::postprocess::PostFxSettings;
 use crate::resources::types::shader::ShaderAsset;
 
 pub struct OpenGlPostFx {
@@ -28,16 +28,21 @@ impl OpenGlPostFx {
 
             let u_resolution = gl.get_uniform_location(program, "u_resolution").unwrap();
             let u_scene = gl.get_uniform_location(program, "u_scene").unwrap();
-            let u_vignette_enabled =
-                gl.get_uniform_location(program, "u_vignette_enabled").unwrap();
-            let u_vignette_intensity =
-                gl.get_uniform_location(program, "u_vignette_intensity").unwrap();
-            let u_vignette_smoothness =
-                gl.get_uniform_location(program, "u_vignette_smoothness").unwrap();
-            let u_vignette_roundness =
-                gl.get_uniform_location(program, "u_vignette_roundness").unwrap();
-            let u_vignette_rounded =
-                gl.get_uniform_location(program, "u_vignette_rounded").unwrap();
+            let u_vignette_enabled = gl
+                .get_uniform_location(program, "u_vignette_enabled")
+                .unwrap();
+            let u_vignette_intensity = gl
+                .get_uniform_location(program, "u_vignette_intensity")
+                .unwrap();
+            let u_vignette_smoothness = gl
+                .get_uniform_location(program, "u_vignette_smoothness")
+                .unwrap();
+            let u_vignette_roundness = gl
+                .get_uniform_location(program, "u_vignette_roundness")
+                .unwrap();
+            let u_vignette_rounded = gl
+                .get_uniform_location(program, "u_vignette_rounded")
+                .unwrap();
 
             gl.use_program(Some(program));
             gl.uniform_1_i32(Some(&u_scene), 0);
@@ -81,10 +86,8 @@ impl OpenGlPostFx {
             self.height = height;
         }
     }
-}
 
-impl PostProcessBackend for OpenGlPostFx {
-    fn resize_postprocess(&mut self, gl: &glow::Context, width: i32, height: i32) {
+    pub fn resize_postprocess(&mut self, gl: &glow::Context, width: i32, height: i32) {
         let width = width.max(1) as u32;
         let height = height.max(1) as u32;
         if width != self.width || height != self.height {
@@ -92,7 +95,7 @@ impl PostProcessBackend for OpenGlPostFx {
         }
     }
 
-    fn begin_scene_pass(&self, gl: &glow::Context) {
+    pub fn begin_scene_pass(&self, gl: &glow::Context) {
         unsafe {
             gl.bind_framebuffer(glow::FRAMEBUFFER, Some(self.scene_fbo));
             gl.viewport(0, 0, self.width as i32, self.height as i32);
@@ -100,7 +103,7 @@ impl PostProcessBackend for OpenGlPostFx {
         }
     }
 
-    fn apply_postprocess(
+    pub fn apply_postprocess(
         &self,
         gl: &glow::Context,
         settings: &PostFxSettings,
@@ -121,10 +124,7 @@ impl PostProcessBackend for OpenGlPostFx {
             gl.bind_texture(glow::TEXTURE_2D, Some(self.scene_color));
 
             gl.uniform_2_f32(Some(&self.u_resolution), width as f32, height as f32);
-            gl.uniform_1_i32(
-                Some(&self.u_vignette_enabled),
-                vignette.enabled as i32,
-            );
+            gl.uniform_1_i32(Some(&self.u_vignette_enabled), vignette.enabled as i32);
             gl.uniform_1_f32(Some(&self.u_vignette_intensity), intensity);
             gl.uniform_1_f32(Some(&self.u_vignette_smoothness), smoothness);
             gl.uniform_1_f32(Some(&self.u_vignette_roundness), roundness);
@@ -142,8 +142,16 @@ unsafe fn create_scene_target(
 ) -> (glow::NativeFramebuffer, glow::NativeTexture) {
     let color = gl.create_texture().expect("create scene color texture");
     gl.bind_texture(glow::TEXTURE_2D, Some(color));
-    gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, glow::LINEAR as i32);
-    gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, glow::LINEAR as i32);
+    gl.tex_parameter_i32(
+        glow::TEXTURE_2D,
+        glow::TEXTURE_MIN_FILTER,
+        glow::LINEAR as i32,
+    );
+    gl.tex_parameter_i32(
+        glow::TEXTURE_2D,
+        glow::TEXTURE_MAG_FILTER,
+        glow::LINEAR as i32,
+    );
     gl.tex_parameter_i32(
         glow::TEXTURE_2D,
         glow::TEXTURE_WRAP_S,

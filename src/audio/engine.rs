@@ -6,16 +6,15 @@ use kira::listener::ListenerHandle;
 use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle};
 use kira::sound::PlaybackState;
 use kira::track::TrackBuilder;
+use kira::{track::TrackHandle, Decibels};
 use kira::{AudioManager, AudioManagerSettings, DefaultBackend, Panning, PlaybackRate, Tween};
-use kira::{Decibels, track::TrackHandle};
 use mint::{Quaternion, Vector3};
 use rand::RngExt;
 
 use crate::audio::api::{
-    AudioError, LoopHandle, ONE_SHOT_POOL_SIZE, PitchRange, PlayParams, SoundData, SoundSource,
-    VolumeLevels, DEFAULT_FADE,
+    AudioError, LoopHandle, PitchRange, PlayParams, SoundData, SoundSource, VolumeLevels,
+    DEFAULT_FADE, ONE_SHOT_POOL_SIZE,
 };
-use crate::audio::mixer::MixerState;
 use crate::audio::presets::SoundPresetRegistry;
 use crate::audio::spatial::{spatial_attenuation, ListenerState};
 use crate::audio::volume::linear_to_decibels;
@@ -76,7 +75,6 @@ pub struct AudioEngine {
     music_looping: bool,
     volumes: VolumeLevels,
     listener: ListenerState,
-    mixer: MixerState,
 }
 
 impl AudioEngine {
@@ -145,7 +143,6 @@ impl AudioEngine {
                 sfx: 1.0,
             },
             listener: ListenerState::default(),
-            mixer: MixerState::default(),
         };
         engine.refresh_bus_volumes();
         Ok(engine)
@@ -154,14 +151,6 @@ impl AudioEngine {
     pub fn update(&mut self, _dt: f32) {
         self.recycle_one_shots();
         self.update_loop_channels();
-    }
-
-    pub fn mixer(&self) -> &MixerState {
-        &self.mixer
-    }
-
-    pub fn mixer_mut(&mut self) -> &mut MixerState {
-        &mut self.mixer
     }
 
     pub fn set_listener(&mut self, position: Vec3, forward: Vec3) {
@@ -175,8 +164,7 @@ impl AudioEngine {
             },
             Tween::default(),
         );
-        let orientation =
-            glam::Quat::from_rotation_arc(Vec3::NEG_Z, forward.normalize_or_zero());
+        let orientation = glam::Quat::from_rotation_arc(Vec3::NEG_Z, forward.normalize_or_zero());
         let _ = self.listener_handle.set_orientation(
             Quaternion {
                 v: Vector3 {
@@ -237,7 +225,8 @@ impl AudioEngine {
 
         let pitch = random_pitch(params.pitch.unwrap_or(sound.pitch));
         let volume = params.volume.unwrap_or(1.0) * sound.volume;
-        let Some(data) = self.build_sfx_data(sound.clip, volume, pitch, params.spatial, false) else {
+        let Some(data) = self.build_sfx_data(sound.clip, volume, pitch, params.spatial, false)
+        else {
             return;
         };
 
@@ -249,9 +238,7 @@ impl AudioEngine {
         });
 
         let Some(slot) = slot else {
-            eprintln!(
-                "[audio] one-shot pool full ({ONE_SHOT_POOL_SIZE} slots), skipping sound"
-            );
+            eprintln!("[audio] one-shot pool full ({ONE_SHOT_POOL_SIZE} slots), skipping sound");
             return;
         };
 
@@ -356,7 +343,8 @@ impl AudioEngine {
             (channel.manual_pitch, channel.volume, channel.spatial)
         };
         let pitch = manual_pitch.unwrap_or_else(|| random_pitch(pitch_range));
-        let Some(mut data) = self.build_sfx_data(clip, channel_volume, pitch, channel_spatial, true)
+        let Some(mut data) =
+            self.build_sfx_data(clip, channel_volume, pitch, channel_spatial, true)
         else {
             return;
         };
@@ -447,12 +435,7 @@ impl AudioEngine {
 
     // --- Music ---
 
-    pub fn play_music(
-        &mut self,
-        source: SoundSource,
-        r#loop: bool,
-        crossfade: Option<Duration>,
-    ) {
+    pub fn play_music(&mut self, source: SoundSource, r#loop: bool, crossfade: Option<Duration>) {
         let sound = match self.presets.resolve(source) {
             Ok(sound) => sound,
             Err(error) => {
@@ -478,12 +461,7 @@ impl AudioEngine {
         self.music_looping = r#loop;
     }
 
-    pub fn crossfade_music(
-        &mut self,
-        source: SoundSource,
-        duration: Duration,
-        r#loop: bool,
-    ) {
+    pub fn crossfade_music(&mut self, source: SoundSource, duration: Duration, r#loop: bool) {
         self.play_music(source, r#loop, Some(duration));
     }
 
@@ -661,7 +639,10 @@ impl AudioEngine {
 
     fn fade_out_slot(&mut self, slot: MusicSlot, fade: Duration) {
         if let Some(handle) = self.music_bus_mut(slot).handle.as_mut() {
-            handle.set_volume(Decibels::from(linear_to_decibels(0.0)), fade_tween(Some(fade)));
+            handle.set_volume(
+                Decibels::from(linear_to_decibels(0.0)),
+                fade_tween(Some(fade)),
+            );
             let _ = handle.stop(fade_tween(Some(fade)));
         }
         self.music_bus_mut(slot).handle = None;

@@ -6,6 +6,8 @@ pub struct RaycastScene {
     pub height: u32,
     pub player_pos: [f32; 2],
     pub player_dir: [f32; 2],
+    /// Camera plane (perpendicular to `player_dir`, length = FOV scale from `player.toml`).
+    pub player_plane: [f32; 2],
     /// x: horizontal sway in world units, y: vertical bob in screen pixels
     pub view_bob: [f32; 2],
 }
@@ -16,7 +18,7 @@ pub struct MapView {
     pub height: u32,
 }
 
-pub trait RenderBackend {
+pub(crate) trait RenderBackend {
     type Texture;
 
     fn resize(&mut self, width: i32, height: i32);

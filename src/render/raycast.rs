@@ -1,6 +1,6 @@
+use crate::render::api::{MapView, RaycastScene, RenderBackend};
 use crate::resources::types::map::MapAsset;
 use crate::resources::types::texture::TextureAsset;
-use crate::render::api::{MapView, RaycastScene, RenderBackend};
 
 pub struct RaycastRenderer<B: RenderBackend> {
     backend: B,
@@ -31,10 +31,6 @@ impl<B: RenderBackend> RaycastRenderer<B> {
 
     pub fn backend(&self) -> &B {
         &self.backend
-    }
-
-    pub fn backend_mut(&mut self) -> &mut B {
-        &mut self.backend
     }
 
     pub fn set_wall_texture(&mut self, texture: &TextureAsset) {

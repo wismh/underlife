@@ -3,10 +3,12 @@ use std::path::Path;
 use toml::Value;
 
 use crate::resources::asset::{Asset, AssetError};
+use crate::resources::assets::SOUNDS;
+use crate::resources::SoundUid;
 
 #[derive(Debug, Clone)]
 pub struct SoundPresetAsset {
-    pub clip: String,
+    pub clip: SoundUid,
     pub volume: f32,
     pub pitch_min: f32,
     pub pitch_max: f32,
@@ -30,8 +32,20 @@ impl Asset for SoundPresetAsset {
         })?;
 
         let path_str = path.display().to_string();
+        let clip_id = get_string(table, "clip", &path_str)?;
+        let clip = SOUNDS
+            .iter()
+            .find(|entry| entry.name == clip_id)
+            .map(|entry| entry.uid)
+            .ok_or_else(|| AssetError::InvalidConfig {
+                path: path_str.clone(),
+                reason: format!(
+                    "unknown sound `{clip_id}` (clip must match a [[sound]] name in the manifest)"
+                ),
+            })?;
+
         Ok(Self {
-            clip: get_string(table, "clip", &path_str)?,
+            clip,
             volume: get_f32(table, "volume", &path_str)?,
             pitch_min: get_f32(table, "pitch_min", &path_str)?,
             pitch_max: get_f32(table, "pitch_max", &path_str)?,

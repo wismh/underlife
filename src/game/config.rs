@@ -1,5 +1,5 @@
-use crate::resources::AssetError;
 use crate::resources::types::config::ConfigAsset;
+use crate::resources::AssetError;
 
 #[derive(Debug, Clone, Copy)]
 pub struct PlayerConfig {

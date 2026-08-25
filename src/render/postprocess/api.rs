@@ -1,3 +1,6 @@
+use crate::resources::types::config::ConfigAsset;
+use crate::resources::AssetError;
+
 #[derive(Debug, Clone, Copy)]
 pub struct PostFxSettings {
     pub vignette: VignetteSettings,
@@ -8,6 +11,21 @@ impl Default for PostFxSettings {
         Self {
             vignette: VignetteSettings::default(),
         }
+    }
+}
+
+impl PostFxSettings {
+    pub fn from_config(config: &ConfigAsset) -> Result<Self, AssetError> {
+        let table = config.section("vignette")?;
+        Ok(Self {
+            vignette: VignetteSettings {
+                enabled: get_bool(table, "enabled", true),
+                intensity: get_f32(config.path(), table, "intensity")?,
+                smoothness: get_f32(config.path(), table, "smoothness")?,
+                roundness: get_f32(config.path(), table, "roundness")?,
+                rounded: get_bool(table, "rounded", false),
+            },
+        })
     }
 }
 
@@ -45,14 +63,31 @@ impl VignetteSettings {
     }
 }
 
-pub trait PostProcessBackend {
-    fn resize_postprocess(&mut self, gl: &glow::Context, width: i32, height: i32);
-    fn begin_scene_pass(&self, gl: &glow::Context);
-    fn apply_postprocess(
-        &self,
-        gl: &glow::Context,
-        settings: &PostFxSettings,
-        width: u32,
-        height: u32,
-    );
+fn get_bool(table: &toml::map::Map<String, toml::Value>, key: &str, default: bool) -> bool {
+    table
+        .get(key)
+        .and_then(|value| value.as_bool())
+        .unwrap_or(default)
+}
+
+fn get_f32(
+    path: &str,
+    table: &toml::map::Map<String, toml::Value>,
+    key: &str,
+) -> Result<f32, AssetError> {
+    let Some(value) = table.get(key) else {
+        return Err(AssetError::InvalidConfig {
+            path: path.to_string(),
+            reason: format!("missing key `{key}`"),
+        });
+    };
+
+    value
+        .as_float()
+        .map(|number| number as f32)
+        .or_else(|| value.as_integer().map(|number| number as f32))
+        .ok_or_else(|| AssetError::InvalidConfig {
+            path: path.to_string(),
+            reason: format!("`{key}` must be a number"),
+        })
 }

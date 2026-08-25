@@ -14,15 +14,12 @@ impl SoundPresetRegistry {
 
         for entry in SOUND_PRESETS {
             let asset = resources.sound_preset(entry.uid);
-            let clip = resources
-                .sound_by_name(&asset.clip)
-                .ok_or(AudioError::UnknownClip)?;
             let index = entry.uid.index() as usize;
             if index >= presets.len() {
                 presets.resize(index + 1, None);
             }
             presets[index] = Some(SoundData {
-                clip,
+                clip: asset.clip,
                 volume: asset.volume,
                 pitch: PitchRange::new(asset.pitch_min, asset.pitch_max),
             });
@@ -39,9 +36,9 @@ impl SoundPresetRegistry {
 
     pub fn resolve(&self, source: super::api::SoundSource) -> Result<SoundData, AudioError> {
         match source {
-            super::api::SoundSource::Preset(uid) => self
-                .get(uid)
-                .ok_or(AudioError::UnknownPreset(uid.index())),
+            super::api::SoundSource::Preset(uid) => {
+                self.get(uid).ok_or(AudioError::UnknownPreset(uid.index()))
+            }
             super::api::SoundSource::Clip(clip) => Ok(SoundData {
                 clip,
                 volume: 1.0,

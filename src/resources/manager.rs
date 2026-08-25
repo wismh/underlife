@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use crate::resources::asset::Asset;
+use crate::resources::asset::{Asset, AssetError};
+use crate::resources::assets::{CONFIGS, MAPS, SHADERS, SOUNDS, SOUND_PRESETS, TEXTURES};
 use crate::resources::paths;
-use crate::resources::assets::{CONFIGS, MAPS, SHADERS, SOUND_PRESETS, SOUNDS, TEXTURES};
 use crate::resources::types::config::ConfigAsset;
 use crate::resources::types::map::MapAsset;
 use crate::resources::types::shader::ShaderAsset;
@@ -26,9 +26,8 @@ pub struct ResourceManager {
 }
 
 impl ResourceManager {
-    pub fn load_all() -> Self {
-        let assets_root =
-            paths::resolve_assets_root().expect("locate runtime assets directory");
+    pub fn load_all() -> Result<Self, AssetError> {
+        let assets_root = paths::resolve_assets_root()?;
         let mut textures = TypedStore::<TextureTag, TextureAsset>::with_capacity(TEXTURES.len());
         let mut maps = TypedStore::<MapTag, MapAsset>::with_capacity(MAPS.len());
         let mut shaders = TypedStore::<ShaderTag, ShaderAsset>::with_capacity(SHADERS.len());
@@ -39,61 +38,52 @@ impl ResourceManager {
 
         for entry in TEXTURES {
             let path = assets_root.join(entry.path);
-            textures
-                .insert(
-                    entry.uid,
-                    TextureAsset::load(&path).expect("load texture asset"),
-                )
-                .expect("duplicate texture uid");
+            insert_unique(
+                &mut textures,
+                entry.uid,
+                TextureAsset::load(&path)?,
+                "texture",
+            )?;
         }
 
         for entry in MAPS {
             let path = assets_root.join(entry.path);
-            maps.insert(entry.uid, MapAsset::load(&path).expect("load map asset"))
-                .expect("duplicate map uid");
+            insert_unique(&mut maps, entry.uid, MapAsset::load(&path)?, "map")?;
         }
 
         for entry in SHADERS {
-            shaders
-                .insert(
-                    entry.uid,
-                    ShaderAsset::load_pair(
-                        &assets_root.join(entry.vert),
-                        &assets_root.join(entry.frag),
-                    )
-                    .expect("load shader asset"),
-                )
-                .expect("duplicate shader uid");
+            insert_unique(
+                &mut shaders,
+                entry.uid,
+                ShaderAsset::load_pair(
+                    &assets_root.join(entry.vert),
+                    &assets_root.join(entry.frag),
+                )?,
+                "shader",
+            )?;
         }
 
         for entry in CONFIGS {
             let path = assets_root.join(entry.path);
-            configs
-                .insert(
-                    entry.uid,
-                    ConfigAsset::load(&path).expect("load config asset"),
-                )
-                .expect("duplicate config uid");
+            insert_unique(&mut configs, entry.uid, ConfigAsset::load(&path)?, "config")?;
         }
 
         for entry in SOUNDS {
             let path = assets_root.join(entry.path);
-            sounds
-                .insert(entry.uid, SoundAsset::load(&path).expect("load sound asset"))
-                .expect("duplicate sound uid");
+            insert_unique(&mut sounds, entry.uid, SoundAsset::load(&path)?, "sound")?;
         }
 
         for entry in SOUND_PRESETS {
             let path = assets_root.join(entry.path);
-            sound_presets
-                .insert(
-                    entry.uid,
-                    SoundPresetAsset::load(&path).expect("load sound preset asset"),
-                )
-                .expect("duplicate sound preset uid");
+            insert_unique(
+                &mut sound_presets,
+                entry.uid,
+                SoundPresetAsset::load(&path)?,
+                "sound_preset",
+            )?;
         }
 
-        Self {
+        Ok(Self {
             assets_root,
             textures,
             maps,
@@ -101,7 +91,7 @@ impl ResourceManager {
             configs,
             sounds,
             sound_presets,
-        }
+        })
     }
 
     pub fn assets_root(&self) -> &Path {
@@ -130,13 +120,6 @@ impl ResourceManager {
 
     pub fn sound_preset(&self, uid: SoundPresetUid) -> &SoundPresetAsset {
         self.sound_presets.get(uid)
-    }
-
-    pub fn sound_by_name(&self, name: &str) -> Option<SoundUid> {
-        SOUNDS
-            .iter()
-            .find(|entry| entry.name == name)
-            .map(|entry| entry.uid)
     }
 }
 
@@ -197,3 +180,18 @@ impl ResourceMarker for SoundTag {}
 impl ResourceMarker for SoundPresetTag {}
 
 pub type ResourceUidFor<M> = crate::resources::uid::ResourceUid<M>;
+
+fn insert_unique<M, T>(
+    store: &mut TypedStore<M, T>,
+    uid: ResourceUidFor<M>,
+    value: T,
+    kind: &'static str,
+) -> Result<(), AssetError>
+where
+    M: ResourceMarker,
+{
+    let index = uid.index();
+    store
+        .insert(uid, value)
+        .map_err(|_| AssetError::DuplicateUid { kind, index })
+}
