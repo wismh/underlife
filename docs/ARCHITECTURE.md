@@ -1,32 +1,32 @@
-# Архітектура `pseudo3d`
+# Architecture of `pseudo3d`
 
-Огляд коду на гілці `main`, коміт `33767305be1149970f2c64849e5d06ecbfdda770` (`feat: sounds`). Це опис того, що є в дереві, а не пропозиція перепису. Не вигадано модулів, типів і файлів: немає `src/input/`, немає ECS, немає окремого world-крейту.
+Review of the code on branch `main`, commit `33767305be1149970f2c64849e5d06ecbfdda770` (`feat: sounds`). This describes what is in the tree, not a proposed rewrite. No invented modules, types, or files: there is no `src/input/`, no ECS, and no separate world crate.
 
-Рантайм-паніки (аудіо без пристрою, `CursorGrabMode::Locked`) зафіксовані в [issue #1](https://github.com/wismh/underlife/issues/1).
+Runtime panics (audio with no device, `CursorGrabMode::Locked`) are recorded in [issue #1](https://github.com/wismh/underlife/issues/1).
 
-У тексті твердження без позначки — факти з коду. **Гіпотеза** — висновок, не підтверджений тестом у репозиторії.
-
----
-
-## 1. Що це за програма
-
-Це **рейкастер у стилі Wolfenstein** (DDA по сітці), не CPU software-рендерер і не 3D mesh-пайплайн.
-
-- **Вікно:** `winit` 0.30, `ApplicationHandler` (`src/engine/app.rs`).
-- **GL:** `glutin` 0.32 + `glutin-winit` 0.5, **OpenGL 3.3 core** (`ContextApi::OpenGl(Some(Version::new(3, 3)))` у `src/engine/window.rs`).
-- **Лоадер:** `glow` 0.16.
-- **Малювання:** **retained** GPU-об’єкти (програми, порожній VAO, текстури, FBO) + **один fullscreen-трикутник на пас** через `gl_VertexID` (`draw_arrays(TRIANGLES, 0, 3)`). Немає VBO, мешів, CPU-циклу по колонках.
-- **Проекція:** 2.5D. Камера — `pos` + `dir` у площині XY. FOV задається вектором **plane**. Фрагментний шейдер збирає його як `vec2(-dir.y, dir.x) * 0.66` (`assets/shaders/raycast.frag`). `Player.plane` / `plane_scale` з `player.toml` **не** завантажуються в GPU.
-- **Постпроцес:** color FBO → vignette fullscreen-пас (`OpenGlPostFx`).
-- **Аудіо:** `kira` 0.12 / `cpal`.
-
-Жанр: прогулянка лабіринтом від першої особи (одна захардкоджена demo-мапа), WASD + mouse look, зациклені кроки, один музичний трек.
+Unmarked claims are facts from the code. **Hypothesis** means an inference not proven by a test in this repository.
 
 ---
 
-## 2. Карта крейту / модулів
+## 1. What this program is
 
-Бінарник — один рядок:
+This is a **Wolfenstein-style grid DDA raycaster**, not a CPU software renderer and not a 3D mesh pipeline.
+
+- **Windowing:** `winit` 0.30 `ApplicationHandler` (`src/engine/app.rs`).
+- **GL:** `glutin` 0.32 + `glutin-winit` 0.5, **OpenGL 3.3 core** (`ContextApi::OpenGl(Some(Version::new(3, 3)))` in `src/engine/window.rs`).
+- **Loader:** `glow` 0.16.
+- **Draw style:** **retained GPU objects** (programs, empty VAO, textures, FBO) + **one fullscreen triangle per pass** via `gl_VertexID` (`draw_arrays(TRIANGLES, 0, 3)`). There is no VBO, no mesh, no CPU column loop.
+- **Projection:** 2.5D. Camera is `pos` + `dir` in the XY plane. FOV is a camera **plane** vector. The fragment shader rebuilds it as `vec2(-dir.y, dir.x) * 0.66` (`assets/shaders/raycast.frag`). `Player.plane` / `plane_scale` from `player.toml` are **not** uploaded to the GPU.
+- **Post:** color FBO → vignette fullscreen pass (`OpenGlPostFx`).
+- **Audio:** `kira` 0.12 / `cpal`.
+
+Genre: first-person maze walkthrough (one hardcoded demo map), WASD + mouse look, looping footsteps, one music track.
+
+---
+
+## 2. Crate / module map
+
+The binary is a one-liner:
 
 ```rust
 // src/main.rs
@@ -35,113 +35,113 @@ fn main() {
 }
 ```
 
-`src/lib.rs` експортує п’ять модулів і `engine::run`.
+`src/lib.rs` exports five modules and `engine::run`.
 
 ```
 pseudo3d
-├── engine     вікно + App (корінь композиції, цикл, інпут, wiring демо)
-├── game       Player, HeadBob, PlayerConfig  (немає світу, немає сутностей)
-├── render     пайплайн, GPU-рейкаст, пост-FX
-├── audio      kira AudioEngine + заглушки міксера
-└── resources  ID з маніфесту, лоадери, TypedStore
+├── engine     window + App (composition root, loop, input, demo wiring)
+├── game       Player, HeadBob, PlayerConfig  (no world, no entities)
+├── render     pipeline, GPU raycast, post FX
+├── audio      kira AudioEngine + unused mixer stubs
+└── resources  manifest IDs, loaders, TypedStore
 ```
 
-| Модуль | Роль | Залежить від |
+| Module | Role | Depends on |
 | --- | --- | --- |
-| `engine::app` | Event loop, god-object `App`, захардкоджені UID демо (`texture::BRICK`, `map::DEMO`, …) | audio, game, render, resources, winit |
-| `engine::window` | Вікно, контекст GL 3.3, surface, vsync, володіє `RenderPipeline` | render, glutin, winit |
-| `game::player` | Поза + колізія проти `MapAsset` | resources (map) |
-| `game::head_bob` | Зміщення walk/idle | числа з `PlayerConfig` |
-| `game::config` | Парсинг `player.toml` через `ConfigAsset` | resources |
-| `render::pipeline` | Scene FBO + raycast + post | opengl backend, `MapAsset` / `TextureAsset` / `ShaderAsset` |
-| `render::raycast` | `RaycastRenderer<B: RenderBackend>` з завантаженими текстурами | типи resources, `RenderBackend` |
-| `render::backend::opengl` | Реальний GL: compile, uniforms, upload, draw | glow, glutin config pick |
-| `render::postprocess` | `PostFxSettings` + трейт `PostProcessBackend`, **параметризований на `glow::Context`** | glow |
-| `audio::engine` | kira manager, кеш кліпів, лупи, музика A/B, пул one-shot | resources, kira |
-| `audio::{api,presets,spatial,volume,mixer}` | типи, resolve пресетів, 2D pan, dB, **stub mixer** | UID resources |
-| `resources::*` | згенеровані `build.rs` ID, `ResourceManager::load_all`, TypedStore | FS, toml, image |
+| `engine::app` | Event loop, `App` god-object, hardcoded demo bindings (`texture::BRICK`, `map::DEMO`, …) | audio, game, render, resources, winit |
+| `engine::window` | Create window, GL 3.3 context, surface, vsync, own `RenderPipeline` | render, glutin, winit |
+| `game::player` | Pose + collision vs `MapAsset` | resources (map) |
+| `game::head_bob` | Walk/idle offsets | `PlayerConfig` numbers |
+| `game::config` | Parse `player.toml` via `ConfigAsset` | resources |
+| `render::pipeline` | Scene FBO + raycast + post | opengl backend, `MapAsset`/`TextureAsset`/`ShaderAsset` |
+| `render::raycast` | Generic `RaycastRenderer<B: RenderBackend>` holding uploaded textures | resources types, `RenderBackend` |
+| `render::backend::opengl` | Real GL: compile, uniforms, texture upload, draw | glow, glutin config pick |
+| `render::postprocess` | `PostFxSettings` + `PostProcessBackend` trait **parameterized on `glow::Context`** | glow |
+| `audio::engine` | kira manager, clip cache, loops, music A/B, one-shot pool | resources, kira |
+| `audio::{api,presets,spatial,volume,mixer}` | Types, preset resolve, 2D pan, dB helpers, **stub mixer** | resources UIDs |
+| `resources::*` | `build.rs`-generated IDs, `ResourceManager::load_all`, typed UID stores | filesystem, toml, image |
 
-**Циклу `mod` немає** (крейт збирається). Є **перевернутий шар**:
+**There is no circular `mod` cycle** (it compiles). There **is** inverted layering:
 
-- `ConfigAsset::post_fx` повертає `crate::render::{PostFxSettings, VignetteSettings}` (`src/resources/types/config.rs`). Шар ассетів знає типи рендера.
-- `engine` знає всі згенеровані UID і всі геймплей-системи.
+- `resources::types::config::ConfigAsset::post_fx` returns `crate::render::{PostFxSettings, VignetteSettings}` (`src/resources/types/config.rs`). The asset layer knows render types.
+- `engine` knows every generated UID and every gameplay system.
 
-**God-object:** `App` володіє вікном, resources, audio, player, head-bob, набором клавіш, post-FX, handle лупу кроків і `PlayerConfig`.
+**God-object:** `App` owns window, resources, audio, player, head-bob, key set, post-FX settings, footstep loop handle, and player config.
 
-**Двигун vs гра:** `engine` не є перевикористовуваним хостом. Правила демо живуть там: яка мапа, які текстури, WASD, Escape → вихід, старт музики, луп кроків. `game` — лише поза + bob + TOML-структури.
+**Engine vs game:** `engine` is not a reusable host. Demo rules live there: which map, which textures, WASD, Escape-to-quit, music start, footstep loop. `game` is only pose + bob + TOML structs.
 
-**Фейкова vs реальна абстракція:**
+**Fake vs real abstraction:**
 
-- `RenderBackend` виглядає як multi-backend. `RenderPipeline` — це `RaycastRenderer<OpenGlBackend>` плюс `OpenGlPostFx`. Пост **не** за `RenderBackend`; він бере `&glow::Context`.
-- `MixerState` — «placeholder hooks» з порожніми `set_ducking` / `set_reverb_send` / `set_eq_low` (`src/audio/mixer.rs`). `AudioEngine` все одно його зберігає.
+- `RenderBackend` looks multi-backend. `RenderPipeline` is `RaycastRenderer<OpenGlBackend>` plus `OpenGlPostFx`. Post is **not** behind `RenderBackend`; it takes `&glow::Context`.
+- `MixerState` is documented as “placeholder hooks” with empty `set_ducking` / `set_reverb_send` / `set_eq_low` (`src/audio/mixer.rs`). `AudioEngine` still stores it.
 
-**ECS немає.** Стан — кілька структур на `App`.
+**No ECS.** State is a handful of structs on `App`.
 
 ---
 
-## 3. Кадровий цикл (вікно, події, таймінг)
+## 3. Frame loop (window, events, timing)
 
-### Старт (до будь-якого кадру)
+### Boot (before any frame)
 
 ```
 main
   → pseudo3d::run()                          // engine/app.rs:17
-      EventLoop::new()?                      // потрібен DISPLAY / Wayland
+      EventLoop::new()?                      // needs DISPLAY/Wayland
       listen_device_events(WhenFocused)
-      App::new()                             // ассети + аудіо, вікна ще немає
+      App::new()                             // load assets + audio, no window yet
       event_loop.run_app(&mut app)
 ```
 
-`App::new` (`src/engine/app.rs`, ~рядки 39–62):
+`App::new` (`src/engine/app.rs`, ~lines 39–62):
 
-1. `ResourceManager::load_all()` — panic, якщо немає каталогу ассетів / decode.
-2. Парсинг postprocess + player configs (`.expect`).
-3. `AudioEngine::new(&resources).expect("init audio engine")` — **відкриває cpal/ALSA тут**, до `resumed`.
-4. `create_loop_handle()` для кроків.
-5. Спавн `Player` з TOML; `window: None`.
+1. `ResourceManager::load_all()` — panics on missing assets dir / decode.
+2. Parse postprocess + player configs (`.expect`).
+3. `AudioEngine::new(&resources).expect("init audio engine")` — **opens cpal/ALSA here**, before `resumed`.
+4. `create_loop_handle()` for footsteps.
+5. Spawn `Player` from TOML; `window: None`.
 
-**Факт (прогін цього дерева):** немає звукового пристрою → panic на `app.rs:47` до появи вікна. Див. [issue #1](https://github.com/wismh/underlife/issues/1).
+**Confirmed (run of this tree):** no sound device → panic at `app.rs:47` before a window exists. See [issue #1](https://github.com/wismh/underlife/issues/1).
 
-### Хто володіє вікном / GL
+### Window / GL ownership
 
-`WindowContext` (`src/engine/window.rs`) володіє:
+`WindowContext` (`src/engine/window.rs`) owns:
 
 - `Arc<winit::window::Window>`
 - `glutin` `Surface<WindowSurface>` + `PossiblyCurrentContext`
-- `RenderPipeline` (GL-об’єкти)
+- `RenderPipeline` (GL objects)
 
-Створюється лише в `ApplicationHandler::resumed` → `init_window`.
+Created only in `ApplicationHandler::resumed` → `init_window`.
 
 `init_window` (`app.rs`, ~65–87):
 
-1. `WindowContext::create(..., raycast_shader, post_shader)` — вікно, GL 3.3, swap interval **Wait(1)** (vsync), лоадер `glow`, `RenderPipeline::new`.
-2. `upload_gpu_resources` — brick/floor/sky + `map::DEMO` у рендерер.
+1. `WindowContext::create(..., raycast_shader, post_shader)` — window, GL 3.3, swap interval **Wait(1)** (vsync), `glow` loader, `RenderPipeline::new`.
+2. `upload_gpu_resources` — bind brick/floor/sky + `map::DEMO` into the renderer.
 3. `capture_mouse` — `CursorGrabMode::Locked.expect("capture mouse")`.
-4. `audio.play_music(Preset(MUSIC), loop, fade 2s)`.
-5. Зберегти вікно.
+4. `audio.play_music(Preset(MUSIC), loop, 2s fade)`.
+5. Store window.
 
-**Факт:** на TigerVNC і Xvfb panic на `app.rs:93` після створення GL і upload, тож **кадр `RedrawRequested` не виконується**. Див. [issue #1](https://github.com/wismh/underlife/issues/1).
+**Confirmed:** on TigerVNC and Xvfb, this panics at `app.rs:93` after GL create/upload, so **no `RedrawRequested` frame runs**. See [issue #1](https://github.com/wismh/underlife/issues/1).
 
-### Розклад колбеків
+### Per-tick split
 
-| Колбек | Що робить |
+| Callback | What it does |
 | --- | --- |
-| `resumed` | `init_window` один раз |
-| `window_event` | close/Escape → `event_loop.exit()`; фокус → grab/ungrab + `mouse_look`; resize → `window.resize`; клавіші в `HashSet<KeyCode>`; `RedrawRequested` → `render()` |
-| `device_event` | якщо `mouse_look`, `MouseMotion.delta.0` → `player.rotate(delta * mouse_sensitivity)` (лише yaw) |
-| `about_to_wait` | якщо вікно є: `dt = min(elapsed, 0.05)`, `update(dt)`, `request_redraw()` |
+| `resumed` | `init_window` once |
+| `window_event` | close/Escape → `event_loop.exit()`; focus → grab/ungrab + `mouse_look`; resize → `window.resize`; keys into `HashSet<KeyCode>`; `RedrawRequested` → `render()` |
+| `device_event` | if `mouse_look`, `MouseMotion.delta.0` → `player.rotate(delta * mouse_sensitivity)` (yaw only) |
+| `about_to_wait` | if window exists: `dt = min(elapsed, 0.05)`, `update(dt)`, `request_redraw()` |
 
-**Таймінг:** `Instant`, **стеля 50 мс**. Не fixed-step, немає акумулятора. `about_to_wait` + `request_redraw` — poll-цикл; vsync — очікування swap-interval у `present()`.
+**Timing:** wall-clock `Instant`, **hard cap 50 ms**. Not fixed-step, not accumulator. `about_to_wait` + `request_redraw` is a **poll-style loop**; vsync is the swap-interval wait inside `present()`.
 
-**Гіпотеза:** якщо композитор ніколи не блокує vsync, `about_to_wait` може крутитися так швидко, як дозволяє event loop. У цьому репо це не вимірювалось.
+**Hypothesis:** under a compositor that never vsync-blocks, this can spin `about_to_wait` as fast as the event loop allows; that was not measured in this repo.
 
-`render()` збирає `RaycastScene` з player + head-bob, `renderer.draw`, `swap_buffers`.
+`render()` builds a `RaycastScene` from player + head-bob, `renderer.draw`, `swap_buffers`.
 
-Окремого модуля інпуту **немає**. Стан клавіш — `App.keys`. Mouse grab — методи `App`.
+There is **no separate input module**. Keyboard state is `App.keys`. Mouse grab is `App` methods.
 
 ---
 
-## 4. Пайплайн рендеру
+## 4. Rendering pipeline
 
 ```
 RaycastScene (CPU uniforms)
@@ -150,8 +150,8 @@ RaycastScene (CPU uniforms)
 RenderPipeline::draw
   OpenGlPostFx::begin_scene_pass   bind scene FBO, viewport, clear
   RaycastRenderer::draw
-    OpenGlBackend::begin_frame     clear, bind raycast program + порожній VAO
-    OpenGlBackend::draw_raycast    uniforms + 4 текстури + draw 3 verts
+    OpenGlBackend::begin_frame     clear, bind raycast program + empty VAO
+    OpenGlBackend::draw_raycast    uniforms + 4 textures + draw 3 verts
     end_frame                      no-op
   OpenGlPostFx::apply_postprocess  default FB, vignette program, draw 3 verts
 WindowContext::present             swap_buffers
@@ -159,133 +159,133 @@ WindowContext::present             swap_buffers
 
 ### CPU vs GPU
 
-**CPU:** decode PNG → RGBA (`TextureAsset`), парсинг мапи в `cells` + `collision` R8, компіляція **рядків** шейдерів, upload один раз. Кожен кадр: зібрати `RaycastScene` (розмір, pos, dir, bob). Колізія `Player::move_relative` читає `MapAsset` на CPU.
+**CPU:** decode PNG to RGBA (`TextureAsset`), parse map to `cells` + `collision` R8, compile shader **source strings**, upload once. Each frame: pack `RaycastScene` (size, pos, dir, bob). Collision `Player::move_relative` samples `MapAsset` on CPU.
 
-**GPU:** DDA в `raycast.frag` (макс. 64 кроки). Мапа — `sampler2D` R8; стіна якщо `texture(u_map).r > 0.5`. Підлога/стеля — affine «row distance», не другий рейкаст по висоті.
+**GPU:** DDA in `raycast.frag` (max 64 steps). Map is `sampler2D` R8; walls if `texture(u_map).r > 0.5`. Floor/ceiling are affine “row distance” samples, not a second raycast of height.
 
-Fullscreen-трикутник генерується в **обох** vert-шейдерах (`raycast.vert`, `postprocess.vert`) з `gl_VertexID`. CPU vertex data немає.
+Fullscreen triangle is generated in **both** verts (`raycast.vert`, `postprocess.vert`) from `gl_VertexID`. No CPU vertex data.
 
-### Камера / проекція
+### Camera / projection
 
-Класичний рейкастер:
+Classic raycaster:
 
 ```
 camera_x = 2 * frag.x / width - 1
-plane = perpendicular(dir) * 0.66     // ЗАХАРДКОДЖЕНО в шейдері
+plane = perpendicular(dir) * 0.66     // HARDCODED in shader
 ray_dir = dir + plane * camera_x
 ```
 
-`Player` тримає `plane` з `plane_scale` (`player.toml` = `0.66`), але `RaycastScene` має лише `player_pos` / `player_dir` / `view_bob`. Зміна `plane_scale` **не змінює FOV на екрані**. Це підтверджений розрив data-path, не гіпотеза.
+`Player` maintains `plane` from `plane_scale` (`player.toml` = 0.66) but `RaycastScene` only has `player_pos` / `player_dir` / `view_bob`. Changing `plane_scale` **does not change FOV on screen**. That is a confirmed data-path split, not a hypothesis.
 
-Head-bob: `u_view_bob.x` зсуває world pos уздовж camera right; `u_view_bob.y` зсуває горизонт у **пікселях** (коментар на `RaycastScene`).
+Head-bob: `u_view_bob.x` shifts world pos along camera right; `u_view_bob.y` shifts horizon in **pixels** (comment on `RaycastScene`).
 
-Fog, max steps, затінення сторони стіни (`0.75` на Y-хітах), стеля `* 0.85` — **константи шейдера**.
+Fog, max steps, wall side-shading (`0.75` on Y hits), ceiling `* 0.85` are **shader constants**.
 
-### Data-driven vs hardcoded
+### Hardcoded vs data-driven
 
-| З даних | Захардкоджено в engine/shader |
+| Data-driven | Hardcoded in engine/shader |
 | --- | --- |
-| Вихідники шейдерів через маніфест | GL 3.3, NEAREST wall/floor, REPEAT wrap |
-| PNG (який файл) | Який UID є wall/floor/ceiling (`BRICK`/`FLOOR`/`SKY`) |
-| Розкладка `demo.map` | Одна мапа `map::DEMO`; клітинки зведені до 0/1 стіна |
-| Vignette з `postprocess.toml` | Unity-style remap у `VignetteSettings::unity_shader_settings` |
-| Швидкості, bob, spawn з `player.toml` | FOV `0.66` у frag; вікно 1280×720 / title `"pseudo3d"` |
+| Shader **source files** via manifest | GL 3.3, NEAREST wall/floor, REPEAT wrap |
+| PNG textures (which file) | Which UID is wall/floor/ceiling (`BRICK`/`FLOOR`/`SKY`) |
+| `demo.map` layout | Single map `map::DEMO`; cell values collapsed to 0/1 wall |
+| `postprocess.toml` vignette | Unity-style remap in `VignetteSettings::unity_shader_settings` |
+| `player.toml` speeds, bob, spawn | FOV `0.66` in frag; window 1280×720 / title `"pseudo3d"` |
 | | `MAX_STEPS = 64`, `FOG_DISTANCE = 8.0` |
 
-`pick_gl_config` віддає перевагу конфігам з transparency, потім **меншій** кількості семплів (`src/render/backend/opengl/mod.rs`). Для гри нетипово (MSAA рейкаст усе одно не використовує).
+`pick_gl_config` prefers configs with transparency, then **fewer** samples (`src/render/backend/opengl/mod.rs`). Unusual for a game (MSAA is unused by the raycast anyway).
 
-`GlTexture` **немає `Drop`**. `OpenGlBackend::drop` видаляє лише program + VAO. Повторний `set_*_texture` витікає попередню GL-текстуру. **Факт** з impl Drop, не з leak-профілювальника.
-
----
-
-## 5. Світ / мапа / стан гри
-
-Це **не** симуляція світу. Одна статична `MapAsset` і один `Player`.
-
-`demo.map` — ASCII: `#`/`1` стіна, `.`/`0`/` ` порожньо, будь-який інший символ — стіна (`parse_row`). Коментарі `;`, порожні рядки пропускаються. Дубль: `cells` (0/1) і `collision` (0/255) для GPU.
-
-**Завантаження:**
-
-1. **Build:** `build.rs` парсить `assets/manifest.toml`, пише `OUT_DIR/asset_ids.rs` (константи UID + слайси `TEXTURES`/`MAPS`/…), копіює `assets/` → `target/{debug,release}/assets`.
-2. **Runtime:** `ResourceManager::load_all` шукає корінь (`PSEUDO3D_ASSETS`, інакше `assets/` поруч з exe, інакше лише в debug `CARGO_MANIFEST_DIR/assets`), потім вантажить **кожний** запис маніфесту в `TypedStore` (vec за індексом UID).
-
-Володіння: `App.resources` після лоаду незмінний (`&self` getters). GPU-копії живуть на `RaycastRenderer`. Зміна мапи в рантаймі не оновить R8-текстуру, поки знову не викличуть `set_map` (ніхто не викликає).
-
-`Player` мутує `pos`/`dir`/`plane`. Колізія: по осях, `is_wall` через `floor` клітинки, потім clamp до `[0.25, dim-1.25]`. Немає сутностей, дверей, спрайтів, висоти.
+`GlTexture` has **no `Drop`**. `OpenGlBackend::drop` deletes program + VAO only. Re-upload via `set_*_texture` leaks the previous GL texture. **Confirmed** from Drop impls, not observed in a leak tool.
 
 ---
 
-## 6. Аудіо
+## 5. World / map / game state
+
+**Not a world simulation.** One static `MapAsset` plus one `Player`.
+
+`demo.map` is ASCII: `#`/`1` wall, `.`/`0`/` ` empty, anything else treated as wall (`parse_row`). `;` comments, empty lines skipped. Duplicate `cells` (0/1) and `collision` (0/255) for GPU.
+
+**Load path:**
+
+1. **Build:** `build.rs` parses `assets/manifest.toml`, emits `OUT_DIR/asset_ids.rs` (UID constants + `TEXTURES`/`MAPS`/… slices), copies `assets/` → `target/{debug,release}/assets`.
+2. **Runtime:** `ResourceManager::load_all` resolves root (`PSEUDO3D_ASSETS`, else next-to-exe `assets/`, else debug-only `CARGO_MANIFEST_DIR/assets`), then loads **every** manifest entry into `TypedStore` (vec indexed by UID).
+
+Ownership: `App.resources` is immutable after load (`&self` getters). GPU copies live on `RaycastRenderer`. Mutating the map at runtime would not update the R8 texture unless `set_map` is called again (nothing does).
+
+`Player` mutates `pos`/`dir`/`plane`. Collision: axis-separated, `is_wall` on cell centers via `floor`, then clamp to `[0.25, dim-1.25]`. No entities, doors, sprites, or height.
+
+---
+
+## 6. Audio
 
 `AudioEngine::new`:
 
 - `AudioManager::<DefaultBackend>::new` (cpal).
-- Сабтреки SFX + music; kira `add_listener` (3D listener; поле з `#[allow(dead_code)]`, але `set_listener` його використовує).
-- `StaticSoundData::from_file` для кожного запису `SOUNDS` (decode на старті, не стрім).
-- `SoundPresetRegistry` мапить TOML `clip = "footsteps"` → UID через **рядкове ім’я** (`sound_by_name`), не через UID у пресеті.
+- SFX + music subtracks; kira `add_listener` (3D listener handle stored, `#[allow(dead_code)]` on the field but `set_listener` uses it).
+- `StaticSoundData::from_file` for every `SOUNDS` entry (decode at init, not stream).
+- `SoundPresetRegistry` maps preset TOML `clip = "footsteps"` → UID via **string name** (`sound_by_name`), not UID in the preset file.
 
-**Що реально викликає `App`:** `create_loop_handle`, `update_loop` (кроки під час WASD), `set_listener(pos/dir гравця)`, `update`, `play_music` один раз. `PlayParams::default()` — **без `spatial`**. Кроки не паннуються за відстанню.
+**What `App` actually uses:** `create_loop_handle`, `update_loop` (footsteps while WASD), `set_listener(player pos/dir)`, `update`, `play_music` once. `PlayParams::default()` — **no `spatial`**. Footsteps are not distance-panned.
 
-**`spatial`:** CPU linear falloff + pan від правого вектора слухача. `let _ = linear_to_decibels(volume_linear)` — no-op. `App` ніколи не передає `SpatialParams`. Орієнтація kira listener все одно оновлюється.
+**Spatial module:** CPU linear falloff + pan from listener right vector. `let _ = linear_to_decibels(volume_linear)` is a no-op. App never passes `SpatialParams`. kira listener orientation is updated anyway.
 
-**Mixer:** заглушка. API гучності (`set_master_volume`, …) `App` не викликає.
+**Mixer:** stub. Volume APIs exist (`set_master_volume`, …) and are unused by `App`.
 
-**Політика помилок:**
+**Error policy split:**
 
-- Ініт: `Result`, потім **`expect` в `App`** → смерть процесу ([issue #1](https://github.com/wismh/underlife/issues/1)).
-- Playback: `eprintln` і skip (пул one-shot повний, невідомий кліп).
+- Init: `Result` then **`expect` in `App`** → process death ([issue #1](https://github.com/wismh/underlife/issues/1)).
+- Playback: `eprintln` and skip (one-shot pool full, unknown clip).
 
-`SoundAsset::load` лише перевіряє `path.is_file()`; помилки decode — у kira всередині `AudioEngine::new`.
-
----
-
-## 7. Інпут
-
-Усе в `App`:
-
-- **Клавіші:** фізичні `KeyCode` у `HashSet`. W/S вперед, A/D strafe, стрілки крутять **лише якщо `!mouse_look`**, Escape виходить.
-- **Mouse look:** `DeviceEvents::WhenFocused` + `DeviceEvent::MouseMotion`. Sensitivity з TOML. **Немає pitch** (для цього рендерера коректно).
-- **Grab:** `Locked` на init і на фокус; `None` при втраті фокусу. При unfocus помилка grab ігнорується (`let _ =`); **init / focus-gained — `expect`**. Асиметрично і фатально на VNC/Xvfb ([issue #1](https://github.com/wismh/underlife/issues/1)).
-
-Немає action map, ребайнду, шару розкладки (лише physical codes).
+`SoundAsset::load` only checks `path.is_file()`; decode errors happen in kira at `AudioEngine::new`.
 
 ---
 
-## 8. Build / ассети
+## 7. Input
 
-`Cargo.toml`: немає `[features]`, немає `rust-version`, `build = "build.rs"`. Lockfile тягне `wayland-protocols` з **edition 2024** → **Rust ≥ 1.85**, хоча крейт — edition 2021.
+All in `App`:
+
+- **Keys:** physical `KeyCode`, held in a `HashSet`. W/S forward, A/D strafe, arrows rotate **only if `!mouse_look`**, Escape exits.
+- **Mouse look:** `DeviceEvents::WhenFocused` + `DeviceEvent::MouseMotion`. Sensitivity from TOML. **No pitch** (correct for this renderer).
+- **Grab:** `Locked` on init and on focus; `None` on unfocus. Focus-lost grab uses `let _ =` (errors ignored); **init/focus-gained uses `expect`**. Asymmetric and fatal on VNC/Xvfb ([issue #1](https://github.com/wismh/underlife/issues/1)).
+
+No action map, no rebinding, no `winit` keyboard layout layer (physical codes only).
+
+---
+
+## 8. Build / asset pipeline
+
+`Cargo.toml`: no `[features]`, no `rust-version`, `build = "build.rs"`. Lockfile pulls `wayland-protocols` **edition 2024** → **Rust ≥ 1.85** even though the crate is edition 2021.
 
 `build.rs`:
 
-- `cargo:rerun-if-changed` на `assets/` і `manifest.toml` (і на кожен шлях sound/preset/config у відповідних секціях).
-- Генерує типізовані UID-модулі (`texture::BRICK`, …).
-- Копіює все дерево `assets` поруч з бінарником (`CARGO_TARGET_DIR` або `./target` + `PROFILE`).
+- `cargo:rerun-if-changed` on `assets/` and `manifest.toml` (and each sound/preset/config path for those sections).
+- Generates typed UID modules (`texture::BRICK`, …).
+- Copies the whole assets tree next to the binary (`CARGO_TARGET_DIR` or `./target` + `PROFILE`).
 
-`.gitattributes`: `*.png` `*.ogg` `*.mp3` → Git LFS. Клон з `GIT_LFS_SKIP_SMUDGE` лишає pointer-файли; тоді `image::open` / kira падають на лоаді.
+`.gitattributes`: `*.png` `*.ogg` `*.mp3` → Git LFS. Clone with `GIT_LFS_SKIP_SMUDGE` leaves pointer files; `image::open` / kira then fail at load.
 
-Маніфест — **єдиний** реєстр ассетів. Текстура без `[[texture]]` копіюється на диск, але UID не отримує.
-
----
-
-## 9. Помилки й тестованість
-
-**`Result` є, потім `expect` на швах, які важливі:**
-
-- `run()` → лише `EventLoopError`; `main` робить expect.
-- Вікно/GL: усі `.expect` / `.unwrap` (`window.rs`, компіляція шейдерів — `panic!`).
-- `ResourceManager::load_all`: expect на кожен файл.
-- `TypedStore::get`: panic, якщо UID немає.
-- Парсинг конфігів: `Result` всередині, `expect` у `App::new`.
-
-`ShaderAsset` імплементує `Asset::load` як **завжди `UnsupportedLoader`**; реальний шлях — `load_pair`. Мертва impl трейту.
-
-**Тестів немає** (`#[test]` / `mod tests` відсутні). Парсер мапи, колізія, blend bob, spatial pan, TOML-лоадери і розрив plane vs шейдер — не покриті. `cargo test` — порожній pass.
-
-**Що блокує тести:** `App` не generic над audio/window; `AudioEngine::new` хоче реальний backend; `WindowContext::create` хоче дисплей; `ResourceManager::load_all` — all-or-nothing і panic.
+Manifest is the **only** asset registry. Adding a texture without a `[[texture]]` entry means it is copied to disk but never given a UID.
 
 ---
 
-## 10. Рантайм (діаграма)
+## 9. Error handling and testability
+
+**Results exist, then get `expect`ed at the seams that matter:**
+
+- `run()` → `EventLoopError` only; `main` expects it.
+- Window/GL: all `.expect` / `.unwrap` (`window.rs`, shader compile `panic!`).
+- `ResourceManager::load_all`: expects on every file.
+- `TypedStore::get`: panics on missing UID.
+- Config parse: `Result` inside, `expect` in `App::new`.
+
+`ShaderAsset` implements `Asset::load` as **always `UnsupportedLoader`**; real path is `load_pair`. Dead trait impl.
+
+**Tests:** none (`#[test]` / `mod tests` absent). Map parser, collision, bob blend, spatial pan, TOML loaders, and the plane-vs-shader FOV split are all untested. `cargo test` is a vacuous pass.
+
+**Testability blockers:** `App` is not generic over audio/window; `AudioEngine::new` needs a real backend; `WindowContext::create` needs a display; `ResourceManager::load_all` is all-or-nothing and panics.
+
+---
+
+## 10. Runtime architecture
 
 ```mermaid
 flowchart TB
@@ -320,25 +320,25 @@ flowchart TB
 
 ---
 
-## Вердикт
+## Verdict
 
-**Нормально для малого прототипу**
+**Sound for a small prototype**
 
-- Чіткий поділ **ID ассетів** (`build.rs`) і **байтів** (runtime).
-- GPU-рейкаст — слушна вартість для fullscreen Wolfenstein-вигляду; шов `RenderBackend` + `RaycastRenderer<B>` має сенс, **якщо** другий backend буде реальним.
-- Колізія гравця і occupancy, яку семплить шейдер (R8 > 0.5 vs `cell != 0`), узгоджені.
-- Поверхня аудіо API (пресети, лупи, crossfade музики, пул one-shot) ширша за демо — ця частина структурована.
-- Post FX у TOML з іменованим Unity vignette remap.
+- Clear split of **asset IDs** (`build.rs`) vs **bytes** (runtime).
+- GPU raycast is the right cost model for a fullscreen Wolfenstein look; `RenderBackend` + `RaycastRenderer<B>` is a reasonable seam **if** a second backend is real.
+- Player collision vs the same occupancy the shader samples (R8 > 0.5 vs `cell != 0`) is coherent.
+- Audio **API surface** (presets, loops, music crossfade, one-shot pool) is larger than the demo — that part is actually structured.
+- Post FX settings live in TOML and match a named Unity vignette remap.
 
-**Що заважатиме рости**
+**What will hurt as it grows**
 
-1. **`App` і є гра.** Наступний ворог, зброя чи друга мапа нарощуватимуть поля і `resources.foo(uid::BAR)` в `update`/`render`.
-2. **Фатальний `expect` на опційних платформених штуках** (звуковий пристрій, cursor lock, swap interval) — бінарник не живе саме там, де розробка/CI. Див. [issue #1](https://github.com/wismh/underlife/issues/1).
-3. **Стан камери дубльований і розсинхронізований** (`Player.plane` vs `0.66` у шейдері).
-4. **`RenderBackend` застосований наполовину** (post і pipeline все ще glow-specific). Або один GL-шлях, або довести трейт.
-5. **`resources` залежить від типів `render`**, пресети звуків — рядкові імена кліпів.
-6. **Немає тестів** на чистому коді (парсер мапи, рух, bob, таблиці UID).
-7. **Зв’язка AudioEngine ↔ App:** ~700-рядкова обгортка kira конструюється через `expect` ради двох звуків. Stub міксера обіцяє майбутнє, яке не підключене.
-8. **Час життя GL-ресурсів** (витік `GlTexture` при replace/drop) стане важливим при hot-reload мап/текстур.
+1. **`App` is the game.** Next enemy, weapon, or second map will accrete more fields and more `resources.foo(uid::BAR)` in `update`/`render`.
+2. **Fatal `expect` on optional platform bits** (audio device, cursor lock, swap interval) makes the binary unusable in exactly the environments you develop/CI on. See [issue #1](https://github.com/wismh/underlife/issues/1).
+3. **Camera state is duplicated and desynced** (`Player.plane` vs shader `0.66`).
+4. **`RenderBackend` is half-applied** (post and pipeline still glow-specific). Either commit to one GL path or finish the trait.
+5. **Resources depending on `render` types** and **stringly-typed sound clip names** in presets will get awkward with more assets.
+6. **No tests** on the only bits that are pure (map parse, movement, bob, UID tables).
+7. **AudioEngine vs App coupling:** a ~700-line kira wrapper is constructed with `expect` for two sounds. Mixer stubs imply a future that is not wired.
+8. **GL resource lifetime** (`GlTexture` leak on replace/drop) will matter when you hot-reload maps/textures.
 
-План робіт з пріоритетами: [PLAN.md](PLAN.md).
+Work plan with priorities: [PLAN.md](PLAN.md).

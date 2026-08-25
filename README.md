@@ -1,8 +1,8 @@
 # underlife (`pseudo3d`)
 
-OpenGL 3.3 GPU-рейкастер (Wolfenstein-style DDA). Крейт: `pseudo3d`.
+OpenGL 3.3 GPU raycaster (Wolfenstein-style DDA). Crate: `pseudo3d`.
 
-- Архітектура: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- План робіт: [docs/PLAN.md](docs/PLAN.md)
+- Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Work plan: [docs/PLAN.md](docs/PLAN.md)
 
-Збірка: Rust **≥ 1.85**, потім `git lfs pull` і `cargo build --release`.
+Build: Rust **≥ 1.85**, then `git lfs pull` and `cargo build --release`.
